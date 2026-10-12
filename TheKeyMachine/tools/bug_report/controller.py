@@ -772,13 +772,18 @@ def populate_bug_report_menu(menu):
     Used both as a ``dynamic_menu`` builder (the TKM logo's contact submenu)
     and as a pinned/shelf tool's own popup (the "bug_report_window"
     tool's "menu" callable) -- one implementation, so the two surfaces can't
-    drift apart. Always starts with "Get in Touch"; previously sent reports
+    drift apart. Ticket Manager comes first when ticket debug is enabled,
+    followed by Get in Touch. Previously sent reports
     (if any) are listed flat underneath it, newest first, with no tooltip of
     their own -- clicking one just opens that report on GitHub.
     """
     from TheKeyMachine.tools import registry
+    from . import tickets
 
     menu.clear()
+    if tickets.is_enabled():
+        menu.addAction("Ticket Manager", callback=lambda *_: tickets.open_manager())
+
     dialog_tool = registry.get_tool("bug_report_open_dialog")
     menu.addAction(
         QtGui.QIcon(dialog_tool.get("icon")),
@@ -787,10 +792,7 @@ def populate_bug_report_menu(menu):
         command_id="bug_report_open_dialog",
     )
 
-    from . import tickets
-
     if tickets.is_enabled():
-        menu.addAction("Ticket Manager", callback=lambda *_: tickets.open_manager())
         menu.addAction("Refetch Issues", callback=tickets.refresh)
 
     entries = list_sent_bug_reports()

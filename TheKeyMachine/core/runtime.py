@@ -8,7 +8,6 @@ Centralized Maya runtime manager for TheKeyMachine.
 
 from __future__ import annotations
 
-import json
 import sys
 from contextlib import contextmanager
 from typing import Any, Callable, Dict, List, Optional
@@ -40,15 +39,10 @@ except ImportError:  # pragma: no cover
     omui = None
 
 
-# This is the one deliberate exception to TKM's "no per-tool optionVars"
-# rule (see core/settings.py, which every other module uses instead). It
-# isn't a user preference -- it's a live status flag recording native
-# OpenMaya callback / scriptJob ids owned by *this* session, so a leftover
-# Python reload or crash can be detected and cleaned up on the next load.
-# It has to be a real Maya optionVar (not the JSON preferences file) because
-# it must survive a `TheKeyMachine` Python module reload within the same
-# Maya session, independent of any file I/O.
+# Native IDs belong to this process only. QApplication survives package reloads
+# but cannot carry stale IDs into a later Maya session, unlike optionVars.
 _OPTIONVAR_NAME = "TKM_RuntimeManager"
+_APP_CALLBACK_ATTRIBUTE = "_tkm_callback_state"
 _APP_RUNTIME_ATTRIBUTE = "_tkm_runtime_manager"
 _TRANSIENT_WIDGET_PROPERTY = "tkm_managed_transient"
 _MANAGER: Optional["RuntimeManager"] = None
@@ -58,20 +52,21 @@ _TKM_WORKSPACE_CONTROLS = ("kWorkspaceControl",)
 
 
 def _load_state() -> Dict[str, Any]:
+    # Discard legacy persisted IDs without attempting to remove their callbacks.
     try:
         if cmds.optionVar(exists=_OPTIONVAR_NAME):
-            raw = cmds.optionVar(q=_OPTIONVAR_NAME)
-            if isinstance(raw, str) and raw:
-                state = json.loads(raw)
-                if isinstance(state, dict):
-                    return {
-                        key: [value for value in state.get(key, [])
-                              if isinstance(value, int) and not isinstance(value, bool) and value > 0]
-                        if isinstance(state.get(key), list) else []
-                        for key in ("om", "scriptjob")
-                    }
+            cmds.optionVar(remove=_OPTIONVAR_NAME)
     except (RuntimeError, ValueError, TypeError, AttributeError, KeyError, IndexError):
         pass
+    app = QtWidgets.QApplication.instance()
+    state = getattr(app, _APP_CALLBACK_ATTRIBUTE, None)
+    if isinstance(state, dict):
+        return {
+            key: [value for value in state.get(key, [])
+                  if isinstance(value, int) and not isinstance(value, bool) and value > 0]
+            if isinstance(state.get(key), list) else []
+            for key in ("om", "scriptjob")
+        }
     return {"om": [], "scriptjob": []}
 
 
@@ -79,13 +74,15 @@ def _save_state(state: Dict[str, Any]) -> None:
     if not (state.get("om") or state.get("scriptjob")):
         _clear_state()
         return
-    try:
-        cmds.optionVar(sv=(_OPTIONVAR_NAME, json.dumps(state)))
-    except (RuntimeError, ValueError, TypeError, AttributeError, KeyError, IndexError):
-        pass
+    app = QtWidgets.QApplication.instance()
+    if app is not None:
+        setattr(app, _APP_CALLBACK_ATTRIBUTE, state)
 
 
 def _clear_state() -> None:
+    app = QtWidgets.QApplication.instance()
+    if app is not None and hasattr(app, _APP_CALLBACK_ATTRIBUTE):
+        delattr(app, _APP_CALLBACK_ATTRIBUTE)
     try:
         if cmds.optionVar(exists=_OPTIONVAR_NAME):
             cmds.optionVar(remove=_OPTIONVAR_NAME)
@@ -93,7 +90,7 @@ def _clear_state() -> None:
         pass
 
 
-def has_persisted_callback_state() -> bool:
+def has_callback_state() -> bool:
     state = _load_state()
     has_callbacks = bool(state.get("om") or state.get("scriptjob"))
     if not has_callbacks:
@@ -304,6 +301,9 @@ def cleanup_workspace_controls(process_events=True) -> None:
 def cleanup_for_reload(delete_workspace=True, process_events=True) -> None:
     """Best-effort full cleanup before unloading, reloading, or replacing TKM files."""
     global _CLEANING_UP
+    app = QtWidgets.QApplication.instance()
+    if app is not None and QtCore.QThread.currentThread() is not app.thread():
+        raise RuntimeError("TheKeyMachine shutdown must run on Maya's main thread")
     if _CLEANING_UP:
         return
     _CLEANING_UP = True
@@ -439,6 +439,7 @@ class RuntimeManager(QtCore.QObject):
         self._anim_curve_coalesce_preset = None
 
         self._event_filter_installed = False
+        self._exit_connected = False
         self._event_filter_watchers: Dict[str, Callable[..., Any]] = {}
         self._background_runner_controller = None
         self._defer_callback_persistence = False
@@ -486,6 +487,9 @@ class RuntimeManager(QtCore.QObject):
         self._defer_callback_persistence = False
         self._started = True
         self._persist_state()
+        if app is not None and not self._exit_connected:
+            app.aboutToQuit.connect(self._on_application_exit)
+            self._exit_connected = True
         self._background_start_timer.start(0)
 
     def shutdown(self, cleanup_widgets: bool = True) -> None:
@@ -507,11 +511,24 @@ class RuntimeManager(QtCore.QObject):
         self._remove_all()
         _clear_state()
         app = QtWidgets.QApplication.instance()
+        if app is not None and self._exit_connected:
+            app.aboutToQuit.disconnect(self._on_application_exit)
+            self._exit_connected = False
         if app is not None and getattr(app, _APP_RUNTIME_ATTRIBUTE, None) is self:
             try:
                 delattr(app, _APP_RUNTIME_ATTRIBUTE)
             except Exception:
                 pass
+
+    def _on_application_exit(self):
+        # Include threads retained by previous package generations after reload.
+        from TheKeyMachine.core import workers
+        workers.shutdown_for_application_exit()
+        try:
+            cleanup_for_reload(process_events=False)
+        except Exception:
+            import logging
+            logging.getLogger(__name__).exception("TheKeyMachine exit cleanup failed")
 
     # ----------------------------
     # Registration helpers

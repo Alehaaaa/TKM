@@ -10,6 +10,36 @@ from TheKeyMachine.core.lifecycle import on_shutdown, ShutdownPhase, ShutdownBlo
 
 
 _BACKGROUND_THREADS = set()
+_APP_THREADS_ATTRIBUTE = "_tkm_background_threads"
+_APP_EXIT_HOOK_ATTRIBUTE = "_tkm_worker_exit_hook"
+
+
+def _application_threads():
+    app = QtCore.QCoreApplication.instance()
+    if app is None:
+        return _BACKGROUND_THREADS
+    threads = getattr(app, _APP_THREADS_ATTRIBUTE, None)
+    if threads is None:
+        threads = set()
+        setattr(app, _APP_THREADS_ATTRIBUTE, threads)
+    if not hasattr(app, _APP_EXIT_HOOK_ATTRIBUTE):
+        # One application-lifetime hook, including after unload or module purge.
+        app.aboutToQuit.connect(shutdown_for_application_exit)
+        setattr(app, _APP_EXIT_HOOK_ATTRIBUTE, shutdown_for_application_exit)
+    return threads
+
+
+def shutdown_for_application_exit():
+    """Join all generations of I/O workers before QApplication destroys them.
+
+    These workers never marshal Maya work to the main thread. Network requests
+    must have timeouts; cancellation cannot interrupt an in-flight request.
+    """
+    threads = tuple(_application_threads())
+    for thread in threads:
+        thread.cancel()
+    for thread in threads:
+        thread.wait()
 
 
 class BackgroundThread(QtCore.QThread):
@@ -27,12 +57,14 @@ class BackgroundThread(QtCore.QThread):
         super().__init__(QtCore.QCoreApplication.instance())
         self._cancelled = False
         _BACKGROUND_THREADS.add(self)
+        _application_threads().add(self)
         self.finished.connect(self._release)
         if parent is not None:
             parent.destroyed.connect(self.cancel)
 
     def _release(self):
         _BACKGROUND_THREADS.discard(self)
+        _application_threads().discard(self)
         self.deleteLater()
 
     def cancel(self, *_args):
@@ -50,8 +82,6 @@ class BackgroundThread(QtCore.QThread):
 @on_shutdown(phase=ShutdownPhase.QUIESCE)
 def shutdown_background_threads():
     threads = tuple(_BACKGROUND_THREADS)
-    for thread in threads:
-        thread.cancel()
     # Catalog readers can import modules or touch command caches. They must
     # exit before teardown. Bound the total wait; never pump Qt events here.
     deadline = monotonic() + 0.2
@@ -62,6 +92,9 @@ def shutdown_background_threads():
                 raise ShutdownBlocked(
                     "A background reader is still finishing. Retry reload once it completes."
                 )
+    # A failed barrier leaves live consumers connected and usable for a retry.
+    for thread in threads:
+        thread.cancel()
 
 
 class BackgroundCallThread(BackgroundThread):

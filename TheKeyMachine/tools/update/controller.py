@@ -341,11 +341,7 @@ def install(command=None, file_path=None, tool_operation=None):
         from TheKeyMachine.core import runtime
 
         runtime.cleanup_for_reload(delete_workspace=True, process_events=True)
-    except Exception:
-        pass
-
-    operation.set_status("Installing Update")
-    try:
+        operation.set_status("Installing Update")
         operation.run_worker(
             _commit_staged_update,
             toolsFolder,

@@ -144,6 +144,7 @@ def reload_toolbar(*_args, anchor_widget=None):
 
     # Reload is a system action, not tool work. Cancel delayed/active ETA UI
     # before showing a prompt that may remain open for an arbitrary duration.
+    toolCommon.check_operation_shutdown()
     toolCommon.finish_active_progress()
     return _reload_toolbar_with_scene_prompt(anchor_widget=anchor_widget)
 
@@ -152,13 +153,11 @@ reload_toolbar._tkm_non_tool_action = True
 
 
 def unload_toolbar(*_args):
-    from TheKeyMachine.ui.widgets import toolbar
-    from TheKeyMachine.core import runtime
+    import TheKeyMachine
+    return TheKeyMachine.unload()
 
-    toolbar_instance = toolbar.get_toolbar()
-    if toolbar_instance:
-        return toolbar_instance.unload()
-    return runtime.cleanup_for_reload(delete_workspace=True, process_events=True)
+
+unload_toolbar._tkm_non_tool_action = True
 
 
 def uninstall(*_args):

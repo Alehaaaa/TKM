@@ -63,6 +63,35 @@ def _matches(attr, translations, rotations, scales):
             or (scales and attr in SCALE_ATTRS))
 
 
+def _apply_selected_key_defaults(selected_keys, operation, translations, rotations, scales):
+    """Resolve each curve/default once, then edit only its selected times."""
+    by_curve = {}
+    for curve, frame in selected_keys:
+        by_curve.setdefault(curve, []).append(frame)
+    defaults = {}
+    operation.set_total(len(selected_keys))
+    for curve, frames in by_curve.items():
+        if operation.cancelled:
+            return
+        destinations = cmds.listConnections(
+            curve + ".output", plugs=True, source=False, destination=True,
+        ) or []
+        if destinations and "." in destinations[0]:
+            node, attr = destinations[0].split(".", 1)
+            if _matches(attr, translations, rotations, scales):
+                key = (node, attr)
+                if key not in defaults:
+                    defaults[key] = _stored_default(node, attr)
+                value = defaults[key]
+                if value is not None:
+                    try:
+                        cmds.keyframe(curve, edit=True, valueChange=value,
+                                      time=[(frame, frame) for frame in frames])
+                    except RuntimeError:
+                        pass
+        operation.step(len(frames))
+
+
 def apply_defaults(translations=False, rotations=False, scales=False, tool_operation=None):
     tool_id = "default_trs" if all((translations, rotations, scales)) else (
         "default_translations" if translations else "default_rotations" if rotations else
@@ -84,31 +113,9 @@ def apply_defaults(translations=False, rotations=False, scales=False, tool_opera
         tint_key=tool_id,
     )
     if target_info.time.mode == "graph_editor_keys":
-        operation.set_total(len(target_info.selected_keys))
-        for curve, frame in target_info.selected_keys:
-            if operation.cancelled:
-                return
-            destinations = cmds.listConnections(
-                curve + ".output",
-                plugs=True,
-                source=False,
-                destination=True,
-            ) or []
-            if not destinations or "." not in destinations[0]:
-                operation.step()
-                continue
-            node, attr = destinations[0].split(".", 1)
-            if not _matches(attr, translations, rotations, scales):
-                operation.step()
-                continue
-            value = _stored_default(node, attr)
-            if value is not None:
-                try:
-                    cmds.keyframe(curve, edit=True, valueChange=value, time=(frame, frame))
-                except RuntimeError:
-                    pass
-            operation.step()
-        return
+        return _apply_selected_key_defaults(
+            target_info.selected_keys, operation, translations, rotations, scales,
+        )
 
     operation.set_total(len(target_info.plugs))
     for plug in target_info.plugs:

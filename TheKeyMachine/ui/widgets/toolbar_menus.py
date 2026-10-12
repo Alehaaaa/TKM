@@ -1221,10 +1221,7 @@ def build_main_system_menu(toolbar):
         system_menu,
         (
             {"command_id": "toolbar_reload"},
-            {
-                "callback": toolbar.unload,
-                "command_id": "toolbar_unload",
-            },
+            {"command_id": "toolbar_unload"},
             {"command_id": "toolbar_uninstall"},
         ),
     )

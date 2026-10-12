@@ -16,7 +16,7 @@ Modified by: Alehaaaa / alehaaaa.github.io
 
 """
 
-__version__ = "1.0.2"
+__version__ = "1.0.3"
 __stage__ = "beta"
 __build__ = "357"
 __codename__ = "Cortado"
@@ -58,6 +58,15 @@ def reload():
 def unload():
     from TheKeyMachine.core import runtime
     return runtime.cleanup_for_reload(delete_workspace=True, process_events=True)
+
+
+def startup():
+    """Idempotent GUI startup; preserve the user's Graph Editor preference."""
+    from maya import cmds
+    if cmds.about(batch=True):
+        return None
+    from TheKeyMachine.ui.widgets import toolbar
+    return toolbar.show()
 
 
 def toggle():

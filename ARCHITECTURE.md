@@ -60,6 +60,12 @@ I/O remain threaded. Controllers batch scene work before crossing to Maya;
 threading is selected for responsiveness, while batching and OpenMaya provide
 the actual scene-processing speedup.
 
+The adaptive worker wrapper only catches errors while parsing its workload
+hint. Coordinator exceptions propagate directly; a failed inline scene edit
+must never be retried on a worker. `process()` edits and advances progress in
+one main-thread crossing per batch, and executes a single batch inline because
+a waiting worker cannot make that same main-thread edit more responsive.
+
 Because a worker-backed operation keeps Qt responsive, another toolbar or
 hotkey invocation can arrive before it finishes. Dispatch queues that command
 FIFO and starts it only after the active operation has completed all undo,
@@ -125,14 +131,16 @@ function callable and replaces an earlier registration of the same module and
 qualified function name. Hooks must tolerate repeated cleanup and partially
 initialized resources. No central module list or module scan is needed.
 
-Use `ShutdownPhase` when an owner has ordering requirements: `QUIESCE`, `UI`,
+Use `ShutdownPhase` when an owner has ordering requirements: `PREFLIGHT`, `QUIESCE`, `UI`,
 `OPERATIONS`, `BACKGROUND`, `TOOLS` (the default), `NATIVE`, then `CACHES`.
 Equal phases run in module/function-name order. Shutdown takes a stable
 snapshot of registered hooks; new registrations apply to the next pass.
 Failures are logged with the owner and traceback and returned to the caller,
 without skipping other hooks. Full cleanup reports incomplete teardown and
-prevents module purge. A `ShutdownBlocked` exception from the `QUIESCE` phase
-stops before resource teardown, allowing a later retry. Nested shutdown calls
+prevents module purge. `PREFLIGHT` rejects active scene/worker operations before
+any resource is changed. `QUIESCE` waits for module-reading workers before
+disconnecting consumers. A failure in either phase stops before resource
+teardown, allowing a later retry. Nested shutdown calls
 are ignored.
 
 The registry has no Maya or Qt dependency. Registration takes constant time;
@@ -143,6 +151,21 @@ Maya and Qt cleanup must run on Maya's main thread.
 Toolbar startup reuses a live instance, or performs one cleanup before replacing
 stale UI. Reload and unload use the same guarded cleanup pipeline, and only Qt
 deferred deletion events are drained during teardown.
+
+`TheKeyMachine.startup()` ensures visibility without toggling it or changing
+the Graph Editor preference. Opening the toolbar refreshes existing generated
+startup blocks without enabling startup for users who disabled it.
+Dock and QWidget close events schedule the same
+unload path after native event dispatch; the retained dock can be restored when
+preflight blocks shutdown. Install/update must complete cleanup before replacing
+files or purging modules. Callback IDs live on QApplication, never in saved
+preferences, so only IDs from this Maya process can be removed.
+
+The Qt adapter and standalone installer select PySide from Maya's Qt major
+version. Other installed bindings and Qt.py preferences cannot override Maya's
+ABI. Host exit joins background workers before tearing down resources. An
+application-owned thread registry and exit hook survive toolbar unload and
+package reload, covering network requests retained from older generations.
 
 Resource cleanup belongs on the controller or service that allocates the
 resource, rather than an API forwarding function. This keeps direct controller

@@ -17,7 +17,7 @@ Modified by: Alehaaaa / alehaaaa.github.io
 
 """
 
-from TheKeyMachine.core.lifecycle import on_shutdown, ShutdownPhase
+from TheKeyMachine.core.lifecycle import on_shutdown, ShutdownPhase, ShutdownBlocked
 
 # Maya related imports
 from maya import cmds, mel, OpenMayaUI as mui
@@ -82,6 +82,7 @@ class toolbar(MayaQWidgetDockableMixin, QtWidgets.QDialog):
         super().__init__(parent=parent)
 
         self._shutting_down = False
+        self._close_pending = False
         self._graph_toolbar_sync_timer = QtCore.QTimer(self)
         self._graph_toolbar_sync_timer.setSingleShot(True)
         self._graph_toolbar_sync_timer.timeout.connect(self._sync_graph_toolbar)
@@ -131,23 +132,30 @@ class toolbar(MayaQWidgetDockableMixin, QtWidgets.QDialog):
         self._schedule_graph_toolbar_sync()
 
     def closeEvent(self, event):
-        """
-        Handles the close event for the toolbar window.
-        Stops all background threads and performs necessary cleanup.
-        """
-        global _toolbar_instance
-        self._begin_shutdown()
-        owns_runtime = _toolbar_instance is self
-        if owns_runtime:
-            _toolbar_instance = None
-            try:
-                runtime.shutdown_runtime_manager(cleanup_widgets=False)
-            except (RuntimeError, ValueError, AttributeError, KeyError, IndexError):
-                pass
+        if self._shutting_down:
+            super().closeEvent(event)
+            return
+        event.ignore()
+        self.dockCloseEventTriggered()
 
-        self._delete_tabbar_painter()
+    def dockCloseEventTriggered(self, *_args):
+        """Leave native close dispatch before deleting the workspace control."""
+        if not self._is_active() or self._close_pending:
+            return
+        self._close_pending = True
+        self._single_shot(0, self._finish_close)
 
-        super().closeEvent(event)
+    def _finish_close(self):
+        self._close_pending = False
+        try:
+            self.unload()
+        except ShutdownBlocked as error:
+            # retain=True keeps the dock alive so a veto can restore it intact.
+            self.showWindow()
+            cmds.warning(str(error))
+        except Exception:
+            import logging
+            logging.getLogger(__name__).exception("Toolbar close cleanup failed")
 
     def _delete_tabbar_painter(self):
         if self.tabbar_painter and QtCompat.isValid(self.tabbar_painter):
@@ -171,6 +179,7 @@ class toolbar(MayaQWidgetDockableMixin, QtWidgets.QDialog):
         except (RuntimeError, ValueError, TypeError, AttributeError, KeyError, IndexError):
             pass
         self._disconnect_toolbar_signals()
+        self._delete_tabbar_painter()
 
     def _is_active(self):
         return not self._shutting_down and QtCompat.isValid(self)
@@ -211,7 +220,7 @@ class toolbar(MayaQWidgetDockableMixin, QtWidgets.QDialog):
                 dockable=True,
                 floating=False,
                 area=area,
-                retain=False,
+                retain=True,
             )
             if not self.isDockable():
                 raise RuntimeError("Maya did not create the toolbar workspace control")
@@ -713,8 +722,8 @@ class toolbar(MayaQWidgetDockableMixin, QtWidgets.QDialog):
         Closes the tool and removes callbacks (safe to call multiple times).
         """
         global _toolbar_instance
-        self._begin_shutdown()
         if _toolbar_instance is not self:
+            self._begin_shutdown()
             runtime.delete_widget(self)
             return
         return unload()
@@ -814,7 +823,7 @@ def _needs_pre_show_cleanup():
     return (
         _workspace_control_exists()
         or runtime.has_previous_runtime()
-        or runtime.has_persisted_callback_state()
+        or runtime.has_callback_state()
     )
 
 
@@ -831,6 +840,9 @@ def show(cleanup_existing=True):
 
     if existing is not None or (cleanup_existing and _needs_pre_show_cleanup()):
         runtime.cleanup_for_reload()
+
+    from TheKeyMachine.core import application
+    application.refresh_userSetup()
 
     try:
         _toolbar_instance = toolbar()

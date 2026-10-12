@@ -209,36 +209,15 @@ def _apply_euler_filter(curves, target_info, operation=None):
 
 
 def delete_keyframes_before_current_time(tool_operation=None):
-    operation = toolCommon.require_tool_operation(tool_operation)
-    target_info = animation.resolve_context(
-        include_channels=True, include_shapes=True, resolve_curves=True
-    )
-    curves = target_info.curves
-    if not _validate_curve_tool_targets(target_info, curves, "delete"):
-        return None
-    current_time = cmds.currentTime(query=True)
-    def _delete_batch(batch):
-        deleted = False
-        for curve in batch:
-            keyframes = cmds.keyframe(curve, query=True, timeChange=True) or []
-            before = [frame for frame in keyframes if frame < current_time]
-            if before:
-                cmds.cutKey(curve, time=(min(before), max(before)), clear=True)
-                deleted = True
-        return deleted
-
-    deleted = any(operation.process(
-        curves,
-        _delete_batch,
-        batch_size=32,
-        status="Deleting Keys Before Current",
-        strategy="worker",
-    ))
-    if not deleted:
-        return animation.notify_empty("keys", "delete")
+    return _delete_keys_around_current(before=True, tool_operation=tool_operation)
 
 
 def delete_keyframes_after_current_time(tool_operation=None):
+    return _delete_keys_around_current(before=False, tool_operation=tool_operation)
+
+
+def _delete_keys_around_current(before, tool_operation=None):
+    """Delete one side of the playhead with one query/edit per curve batch."""
     operation = toolCommon.require_tool_operation(tool_operation)
     target_info = animation.resolve_context(
         include_channels=True, include_shapes=True, resolve_curves=True
@@ -248,20 +227,21 @@ def delete_keyframes_after_current_time(tool_operation=None):
         return None
     current_time = cmds.currentTime(query=True)
     def _delete_batch(batch):
-        deleted = False
-        for curve in batch:
-            keyframes = cmds.keyframe(curve, query=True, timeChange=True) or []
-            after = [frame for frame in keyframes if frame > current_time]
-            if after:
-                cmds.cutKey(curve, time=(min(after), max(after)), clear=True)
-                deleted = True
-        return deleted
+        keyframes = cmds.keyframe(batch, query=True, timeChange=True) or []
+        frames = [frame for frame in keyframes
+                  if (frame < current_time if before else frame > current_time)]
+        if not frames:
+            return False
+        # The union's bounds cover all keys on this side for every curve. Use
+        # real key times so fractional keys and the exact playhead are preserved.
+        cmds.cutKey(batch, time=(min(frames), max(frames)), clear=True)
+        return True
 
     deleted = any(operation.process(
         curves,
         _delete_batch,
         batch_size=32,
-        status="Deleting Keys After Current",
+        status="Deleting Keys {} Current".format("Before" if before else "After"),
         strategy="worker",
     ))
     if not deleted:

@@ -250,7 +250,7 @@ def nudge_all_keys(direction, tool_operation=None):
         if edited:
             operation.run_on_main(_move_current_time, offset)
 
-    operation.run_worker(_apply)
+    operation.run_worker(_apply, work_items=len(curves))
 
 
 def nudge_scene(direction, tool_operation=None):
@@ -277,7 +277,7 @@ def nudge_scene(direction, tool_operation=None):
         if edited:
             operation.run_on_main(_move_current_time, offset)
 
-    operation.run_worker(_apply)
+    operation.run_worker(_apply, work_items=len(curves))
 
 
 def shift_inbetween(direction, scene=False, tool_operation=None):

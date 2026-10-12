@@ -20,14 +20,18 @@ import maya.cmds as cmds
 import maya.OpenMayaUI as omui
 
 
-try:
+# The installer is standalone; select the host ABI before importing any Qt.
+_qt_major = str(cmds.about(qtVersion=True)).split(".", 1)[0]
+if _qt_major == "5":
     from shiboken2 import wrapInstance
     from PySide2 import QtWidgets, QtCore, QtGui
-except Exception:
+elif _qt_major == "6":
     from shiboken6 import wrapInstance
     from PySide6 import QtWidgets, QtCore, QtGui
+else:
+    raise ImportError("Unsupported Maya Qt version: {}".format(_qt_major))
 
-__version__ = "1.0.2"
+__version__ = "1.0.3"
 __stage__ = "beta"
 __build__ = "357"
 __codename__ = "Cortado"
@@ -166,7 +170,15 @@ def replace_install(src, dst):
             traceback.print_exc()
 
 
+def cleanup_running_tkm():
+    """Use the currently loaded generation before replacing any of its files."""
+    runtime = sys.modules.get("TheKeyMachine.core.runtime")
+    if runtime is not None:
+        runtime.cleanup_for_reload(delete_workspace=True, process_events=True)
+
+
 def unload_tkm_modules():
+    cleanup_running_tkm()
     for module_name in list(sys.modules.keys()):
         if module_name == "TheKeyMachine" or module_name.startswith("TheKeyMachine."):
             del sys.modules[module_name]
@@ -181,10 +193,10 @@ def ensure_scripts_on_path():
 def load_thekeymachine():
     ensure_scripts_on_path()
     unload_tkm_modules()
+    importlib.invalidate_caches()
 
     import TheKeyMachine
 
-    TheKeyMachine = importlib.reload(TheKeyMachine)
     TheKeyMachine.welcome()
 
 
@@ -221,6 +233,7 @@ def install_thekeymachine(parent):
 
         parent.set_status("Copying and validating files...")
         QtWidgets.QApplication.processEvents()
+        unload_tkm_modules()
         replace_install(src, dst)
 
         parent.set_status("Installation completed. Loading TheKeyMachine...")

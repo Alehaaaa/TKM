@@ -48,8 +48,11 @@ def convert_rotation_order(rot_order="zxy", tool_operation=None):
     if not selection:
         return wutil.make_inViewMessage("Select a control")
 
-    skipped = [obj for obj in selection if not has_rotate_order(obj)]
-    selection = [obj for obj in selection if has_rotate_order(obj)]
+    skipped = []
+    supported = []
+    for obj in selection:
+        (supported if has_rotate_order(obj) else skipped).append(obj)
+    selection = supported
     if skipped:
         wutil.make_inViewMessage("Skipped controls without rotation order")
     if not selection:
@@ -61,16 +64,16 @@ def convert_rotation_order(rot_order="zxy", tool_operation=None):
     all_key_times = []
     keyed_objects = []
     unkeyed_objects = []
+    target_curves = set(target_info.curves)
+    selected_times = {
+        float(frame) for curve, frame in target_info.selected_keys
+        if curve in target_curves
+    } if target_info.time.mode == "graph_editor_keys" else set()
 
     for obj in selection:
         rotate_keys = cmds.keyframe(obj, attribute="rotate", query=True, timeChange=True)
         if rotate_keys:
             if target_info.time.mode == "graph_editor_keys":
-                selected_times = {
-                    float(frame)
-                    for curve, frame in target_info.selected_keys
-                    if curve in target_info.curves
-                }
                 rotate_keys = [frame for frame in rotate_keys if float(frame) in selected_times]
             elif target_info.time.mode == "time_slider_range":
                 rotate_keys = [
@@ -200,12 +203,15 @@ class GimbalAnalyzer:
         if not key_times:
             key_times = {cmds.currentTime(query=True)}
 
+        # Sampling Maya is the expensive part. Every candidate order uses the
+        # same source rotations; only the local Euler conversion differs.
+        rotations = [self._rotation_at_time(obj, frame, order_list)
+                     for frame in sorted(key_times)] if order_list else []
         percentages = []
         for target_order_name in order_list:
             target_order = self.convert_order_string(target_order_name)
             worst = 0
-            for frame in sorted(key_times):
-                rotation = self._rotation_at_time(obj, frame, order_list)
+            for rotation in rotations:
                 reordered = om.MEulerRotation(rotation.x, rotation.y, rotation.z, rotation.order)
                 reordered.reorderIt(target_order)
                 worst = max(worst, self.compute_gimbal_percentage(reordered))

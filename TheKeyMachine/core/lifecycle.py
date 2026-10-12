@@ -14,6 +14,7 @@ class ShutdownBlocked(RuntimeError):
 
 
 class ShutdownPhase(IntEnum):
+    PREFLIGHT = -2
     QUIESCE = -1
     UI = 0
     OPERATIONS = 1
@@ -50,8 +51,8 @@ def on_shutdown(*, phase=ShutdownPhase.TOOLS):
 def shutdown():
     """Run a stable ordered snapshot, returning the names of failed hooks.
 
-    A failing hook cannot skip other owners. Nested shutdown calls are no-ops;
-    registrations made during shutdown take effect on the next call.
+    Preflight failures veto teardown; teardown failures do not skip other owners.
+    Nested calls are no-ops; registrations during shutdown apply next time.
     """
     global _running
     if _running:
@@ -60,15 +61,17 @@ def shutdown():
     failures = []
     try:
         ordered = sorted(_hooks.items(), key=lambda item: (item[1][0], item[0]))
-        for (module, name), (_, callback) in ordered:
+        for (module, name), (phase, callback) in ordered:
             try:
                 callback()
             except ShutdownBlocked:
                 raise
             except Exception:
                 owner = module + "." + name
-                failures.append(owner)
                 _logger.exception("Shutdown hook failed: %s", owner)
+                if phase <= ShutdownPhase.QUIESCE:
+                    raise ShutdownBlocked("Shutdown preflight failed: " + owner)
+                failures.append(owner)
     finally:
         _running = False
     return tuple(failures)

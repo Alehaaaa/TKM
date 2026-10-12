@@ -6,7 +6,7 @@
 
 **The Open Source Animation toolbar for Autodesk Maya.**
 
-![Version](https://img.shields.io/badge/version-1.0.2-blue.svg)
+![Version](https://img.shields.io/badge/version-1.0.3-blue.svg)
 
 TheKeyMachine (TKM) is a Maya toolbar for Animation. Change timing, posing, curve editing, selection, mirroring, pivots, and space switches.
 
@@ -22,7 +22,7 @@ This independent fork is maintained by [Alehaaaa](https://alehaaaa.github.io). T
 
 This list follows the toolbar from left to right. Clicking runs the main action. Menus and modifier keys provide additional modes. Tools can also be pinned, assigned a hotkey, or added to a Maya shelf.
 
-The **TKM menu** comes first: layout and docking, Workspaces, Hotkeys, languages, tooltips, Start with Maya, toolbar toggle/reload/unload/uninstall, shelf setup, updates, Bug Report, Version History, About, Donate, documentation, community links, and debug tools.
+The **TKM menu** comes first: layout and docking, Workspaces, Hotkeys, languages, tooltips, Start with Maya, toolbar toggle/reload/unload/uninstall, shelf setup, updates, Get in Touch, Version History, About, Donate, documentation, community links, and debug tools.
 
 <details>
 <summary><b>Timing & Keys</b>: Nudge, Default, Bake, Key Sync</summary>
@@ -44,10 +44,9 @@ The **TKM menu** comes first: layout and docking, Workspaces, Hotkeys, languages
 </details>
 
 <details>
-<summary><b>Selection & Scene Setup</b>: Isolate, Locators, Selection</summary>
+<summary><b>Selection & Scene Setup</b>: Isolate, Selection</summary>
 
 - **Isolate:** Isolate controls, step down a hierarchy level, and save isolate bookmarks.
-- **Locators:** Create, select, and remove temporary locators.
 - **Selection:** Selector, Select Hierarchy, Select Rig Controls, Select Animated Rig Controls, Select Scene Animation, and Clear Key Selection.
 
 </details>
@@ -77,6 +76,7 @@ The **TKM menu** comes first: layout and docking, Workspaces, Hotkeys, languages
 - **Movers:** Micro Move for precise translate/rotate work; Depth Mover for pushing controls toward or away from camera.
 - **Temp Pivot:** Last Object, Centered, World Space, Edit, and Reset.
 - **Follow Cam:** Create or remove a camera that follows translation, rotation, or both.
+- **Temporal Controls:** Build temporary Simple, Group, Aim, or FK Chain controls in several spaces, then mute, bake, remove, or revert them from the toolbar or panel.
 
 </details>
 
@@ -111,6 +111,7 @@ Colored sets, inline rename, duplicate checks, clear all, and quick or regular i
 - **Global Curve:** Capture selected or visible curves, then reshape their values, timing, and tangents together from one simplified curve.
 - **Graph Tools:** Select Object from Curve, Isolate, Flip, Overlap, Mute, Lock, Match Curves, and Graph Filter controls.
 - **Anim Curve Tools:** Smart Key, Smart Key All Channels, Smart Euler Filter, Snap, Reverse, Clear, Crop, redundant/static cleanup, Copy/Cut/Delete/Paste/Paste Relative, key/frame navigation, and delete-before/after-current-frame.
+- **Animation Layers:** Open the layer tools, Smart Merge selected layers, or import and export layer animation.
 
 </details>
 

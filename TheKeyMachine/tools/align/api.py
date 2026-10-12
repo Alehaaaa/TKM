@@ -7,13 +7,14 @@ import TheKeyMachine.ui.widgets.util as wutil
 
 def _collect_keyframes(objects, attributes=None, layer_context=None):
     layer_context = layer_context or animation.layer_cache.capture()
-    frames = set()
+    query_targets = []
+    layered = bool(attributes) and animation.has_anim_layers()
     for obj in objects or []:
         plugs = [
             "{}.{}".format(obj, attribute)
             for attribute in (attributes or ())
         ]
-        if plugs and animation.has_anim_layers():
+        if plugs and layered:
             for plug in plugs:
                 destination = layer_context.destination_for_plug(plug)
                 if destination.get("blocked"):
@@ -24,12 +25,13 @@ def _collect_keyframes(objects, attributes=None, layer_context=None):
                 )
                 if not curve:
                     continue
-                for frame in cmds.keyframe(curve, query=True, timeChange=True) or []:
-                    frames.add(float(frame))
+                query_targets.append(curve)
         else:
-            for frame in cmds.keyframe(obj, query=True, timeChange=True) or []:
-                frames.add(float(frame))
-    return sorted(frames)
+            query_targets.append(obj)
+    if not query_targets:
+        return []
+    frames = cmds.keyframe(list(dict.fromkeys(query_targets)), query=True, timeChange=True) or []
+    return sorted({float(frame) for frame in frames})
 
 
 def _target_keyframes_for_context(
@@ -77,22 +79,22 @@ def _apply_auto_euler_filter(objects, target_info, layer_context=None, operation
         for attr in ("rotateX", "rotateY", "rotateZ")
         if cmds.objExists("{}.{}".format(obj, attr))
     ]
-    curves = []
-    for plug in plugs:
-        destination = layer_context.destination_for_plug(plug)
-        if destination.get("blocked"):
-            continue
-        curve = animation.layer_graph.curve_for_plug(
-            plug,
-            layer_name=destination.get("layer"),
-        )
-        if curve:
-            curves.append(curve)
     if not animation.has_anim_layers():
         curves = animation.layer_graph.curves_for_plugs(
             plugs,
             include_all_layers=True,
         )
+    else:
+        curves = []
+        for plug in plugs:
+            destination = layer_context.destination_for_plug(plug)
+            if destination.get("blocked"):
+                continue
+            curve = animation.layer_graph.curve_for_plug(
+                plug, layer_name=destination.get("layer"),
+            )
+            if curve:
+                curves.append(curve)
     if curves:
         with animation.preserve_key_selection():
             animation.apply_smart_euler_filter(

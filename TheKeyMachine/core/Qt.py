@@ -2286,6 +2286,18 @@ class MissingMember(object):
         raise NotImplementedError(self.__err)
 
 
+def _maya_binding():
+    """Use Maya's Qt ABI even when other bindings are importable on sys.path."""
+    try:
+        from maya import cmds
+    except ImportError:
+        return None
+    major = str(cmds.about(qtVersion=True)).split(".", 1)[0]
+    if major not in ("5", "6"):
+        raise ImportError("Unsupported Maya Qt version: {}".format(major))
+    return "PySide6" if major == "6" else "PySide2"
+
+
 def _install():
     # Default order (customize order and content via QT_PREFERRED_BINDING)
     default_order = ("PySide6", "PyQt6", "PySide2", "PyQt5")
@@ -2318,7 +2330,8 @@ def _install():
         # QT_PREFERRED_BINDING environment variable if defined.
         preferred_order = [b for b in QT_PREFERRED_BINDING.split(os.pathsep) if b]
 
-    order = preferred_order or default_order
+    maya_binding = _maya_binding()
+    order = (maya_binding,) if maya_binding else (preferred_order or default_order)
 
     available = {
         "PySide6": _pyside6,

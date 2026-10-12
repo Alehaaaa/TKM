@@ -21,6 +21,7 @@ from maya import cmds
 import json
 import shutil
 import subprocess
+import tempfile
 import os
 import sys
 
@@ -224,8 +225,6 @@ def install_userSetup(install=True):
             # Remove existing block between startCode and endCode
             inside_block = False
             for line in lines:
-                if line == cmds_import:
-                    cmds_import = ""
                 if line.strip() == startCode:
                     inside_block = True
                 if not inside_block:
@@ -239,7 +238,7 @@ def install_userSetup(install=True):
     except IOError:
         newUserSetup = ""
 
-    run_script = "import TheKeyMachine; TheKeyMachine.toggle()"
+    run_script = "import TheKeyMachine; TheKeyMachine.startup()"
     tkm_run_code = (
         "{}\n\n".format(startCode)
         + "{0}".format(cmds_import)
@@ -254,6 +253,43 @@ def install_userSetup(install=True):
     # Write the updated userSetup file
     with open(user_setup_file, "w") as output_file:
         output_file.write(newUserSetup)
+
+
+def refresh_userSetup():
+    """Upgrade only an existing generated startup block; never enable startup."""
+    try:
+        path = _user_setup_path()
+        with open(path, "rb") as input_file:
+            original = input_file.read()
+        lines = original.splitlines(keepends=True)
+        inside_block = False
+        legacy_startup = False
+        for index, line in enumerate(lines):
+            if line.strip() == b"# start TheKeyMachine":
+                inside_block = True
+            elif inside_block and line.strip() == b"# end TheKeyMachine":
+                if legacy_startup:
+                    _replace_startup_file(path, b"".join(lines))
+                return
+            elif inside_block and b"import TheKeyMachine; TheKeyMachine.toggle()" in line:
+                lines[index] = line.replace(b"TheKeyMachine.toggle()", b"TheKeyMachine.startup()")
+                legacy_startup = True
+    except OSError:
+        import logging
+        logging.getLogger(__name__).debug("Startup script could not be refreshed", exc_info=True)
+
+
+def _replace_startup_file(path, content):
+    """Preserve the existing file if writing an upgraded block fails."""
+    descriptor, temporary = tempfile.mkstemp(dir=os.path.dirname(path), prefix=".tkm-startup-")
+    try:
+        with os.fdopen(descriptor, "wb") as output_file:
+            output_file.write(content)
+        shutil.copymode(path, temporary)
+        os.replace(temporary, path)
+    finally:
+        if os.path.exists(temporary):
+            os.remove(temporary)
 
 
 # ---------------------------------------------------- UNINSTALL ---------------------------------------------------------------------------------

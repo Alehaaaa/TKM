@@ -1,5 +1,5 @@
 
-from TheKeyMachine.core.lifecycle import on_shutdown, ShutdownPhase
+from TheKeyMachine.core.lifecycle import on_shutdown, ShutdownPhase, ShutdownBlocked
 from collections import deque
 from contextlib import contextmanager
 from functools import lru_cache
@@ -852,10 +852,13 @@ class ToolOperation(object):
         work_items = kwargs.pop("work_items", None)
         if work_items is not None:
             try:
-                if int(work_items) < WORKER_MIN_WORK_ITEMS:
-                    return fn(*args, **kwargs)
+                work_items = int(work_items)
             except (TypeError, ValueError):
-                pass
+                work_items = None
+        if work_items is not None and work_items < WORKER_MIN_WORK_ITEMS:
+            # Only conversion errors belong to the fallback above. An exception
+            # from the coordinator must propagate, never execute it a second time.
+            return fn(*args, **kwargs)
         self._worker_wait_depth += 1
         try:
             return _run_worker_thread(fn, *args, **kwargs)
@@ -900,19 +903,28 @@ class ToolOperation(object):
 
         results = []
 
+        def _process_batch(batch):
+            result = edit_batch(batch)
+            if advance_progress:
+                self.step(len(batch))
+            return result
+
         def _coordinator():
             for start in range(0, len(items), batch_size):
                 if self.cancelled:
                     break
                 batch = items[start : start + batch_size]
-                results.append(self.run_on_main(edit_batch, batch))
-                if advance_progress:
-                    self.step(len(batch))
+                # Edit and progress share one main-thread crossing per batch.
+                results.append(self.run_on_main(_process_batch, batch))
             return results
 
         if strategy == "main":
             return _coordinator()
         if strategy == "worker":
+            # One Maya batch blocks the GUI for the same duration either way;
+            # a waiting coordinator adds no cancellation/painting opportunity.
+            if len(items) <= batch_size:
+                return _coordinator()
             return self.run_worker(_coordinator, work_items=len(items))
         raise ValueError("Unknown operation processing strategy: {}".format(strategy))
 
@@ -969,6 +981,18 @@ class ToolOperation(object):
 
 
 _TOOL_OPERATION_STACK = []
+
+
+@on_shutdown(phase=ShutdownPhase.PREFLIGHT)
+def check_operation_shutdown():
+    """Keep resources alive until scene work and its undo/refresh scope finish.
+
+    System actions may shut down from their own idle, non-editing operation.
+    Never wait here: a worker may be waiting for a main-thread scene call.
+    """
+    if any(operation.accepts_deferred_commands or operation.undo_chunk_opened
+           or operation.refresh_suspended for operation in _TOOL_OPERATION_STACK):
+        raise ShutdownBlocked("A tool operation is still running. Retry once it finishes.")
 
 
 def current_tool_operation():
