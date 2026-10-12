@@ -1,10 +1,53 @@
 {
-  "latest": "1.0.2",
+  "latest": "1.0.3",
   "generatedFrom": {
     "versionFile": "TheKeyMachine/version",
     "changelog": "TheKeyMachine/changelog"
   },
   "releases": [
+    {
+      "version": "1.0.3",
+      "tag": "TKM-1.0.3",
+      "publishedAt": "2026-10-12T18:28:57Z",
+      "publishedLabel": "October 12, 2026",
+      "hasRelease": true,
+      "url": "https://github.com/Alehaaaa/TKM/releases/tag/TKM-1.0.3",
+      "hasDownload": true,
+      "downloadUrl": "https://github.com/Alehaaaa/TKM/releases/download/TKM-1.0.3/TKM-1.0.3.zip",
+      "entries": [
+        {
+          "kind": "new",
+          "label": "New",
+          "description": "An optional Ticket Manager can browse, search, filter, and update inbox ticket statuses"
+        },
+        {
+          "kind": "polish",
+          "label": "Polish",
+          "description": "Align, Default, Gimbal Fixer, Nudge, and key deletion process dense animation more efficiently"
+        },
+        {
+          "kind": "bugfix",
+          "label": "Bugfix",
+          "description": "Closing, unloading, reloading, or updating waits for active tool work instead of interrupting scene edits"
+        },
+        {
+          "kind": "bugfix",
+          "label": "Bugfix",
+          "description": "Start with Maya opens the toolbar without toggling it closed or changing the Graph Editor toolbar preference"
+        },
+        {
+          "kind": "bugfix",
+          "label": "Bugfix",
+          "description": "Reloads and Maya exit clean up callbacks and background work without carrying stale session data forward"
+        },
+        {
+          "kind": "bugfix",
+          "label": "Bugfix",
+          "description": "Maya always loads the matching PySide version, including from the drag-and-drop installer"
+        }
+      ],
+      "compareUrl": "https://github.com/Alehaaaa/TKM/compare/TKM-1.0.2...TKM-1.0.3"
+    },
     {
       "version": "1.0.2",
       "tag": "TKM-1.0.2",
