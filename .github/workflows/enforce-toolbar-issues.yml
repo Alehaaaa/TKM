@@ -1,0 +1,34 @@
+name: Enforce toolbar issue intake
+
+on:
+  issues:
+    types: [opened]
+
+permissions:
+  issues: write
+
+jobs:
+  reject-untrusted-intake:
+    if: >-
+      !contains(github.event.issue.labels.*.name, 'source:user-reported') &&
+      !contains(github.event.issue.labels.*.name, 'source:auto-detected')
+    runs-on: ubuntu-latest
+    steps:
+      - name: Close issues not created by the TKM relay
+        uses: actions/github-script@v8
+        with:
+          script: |
+            const issue = context.issue;
+            await github.rest.issues.createComment({
+              ...issue,
+              body: 'TKM issues are collected from Maya so reports include the diagnostic context needed to investigate them. Please use **Get in Touch** in the TheKeyMachine toolbar.'
+            });
+            await github.rest.issues.update({
+              ...issue,
+              state: 'closed',
+              state_reason: 'not_planned'
+            });
+            await github.rest.issues.lock({
+              ...issue,
+              lock_reason: 'off-topic'
+            });

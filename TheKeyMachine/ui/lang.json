@@ -333,22 +333,22 @@
         "zh": "正在发送建议，请稍候……"
     },
     "bug_report_status_success": {
-        "ar": "تم إرسال تقرير الخطأ بشكل خاص. شكرًا لك!",
-        "ca": "L'informe d'error s'ha enviat de manera privada. Gràcies!",
-        "es": "El informe de error se envió de forma privada. ¡Gracias!",
-        "fr": "Le rapport de bug a été envoyé en privé. Merci !",
-        "ja": "バグレポートを非公開で送信しました。ありがとうございます！",
-        "ko": "버그 보고서를 비공개로 보냈습니다. 감사합니다!",
-        "zh": "错误报告已私密发送。谢谢！"
+        "ar": "تم نشر تقرير الخطأ على GitHub. شكرًا لك!",
+        "ca": "L'informe d'error s'ha publicat a GitHub. Gràcies!",
+        "es": "El informe de error se publicó en GitHub. ¡Gracias!",
+        "fr": "Le rapport de bug a été publié sur GitHub. Merci !",
+        "ja": "バグレポートを GitHub に公開しました。ありがとうございます！",
+        "ko": "버그 보고서를 GitHub에 공개했습니다. 감사합니다!",
+        "zh": "错误报告已发布到 GitHub。谢谢！"
     },
     "bug_report_status_success_suggestion": {
-        "ar": "تم إرسال الاقتراح بشكل خاص. شكرًا لك!",
-        "ca": "El suggeriment s'ha enviat de manera privada. Gràcies!",
-        "es": "La sugerencia se envió de forma privada. ¡Gracias!",
-        "fr": "La suggestion a été envoyée en privé. Merci !",
-        "ja": "提案を非公開で送信しました。ありがとうございます！",
-        "ko": "제안을 비공개로 보냈습니다. 감사합니다!",
-        "zh": "建议已私密发送。谢谢！"
+        "ar": "تم نشر الاقتراح على GitHub. شكرًا لك!",
+        "ca": "El suggeriment s'ha publicat a GitHub. Gràcies!",
+        "es": "La sugerencia se publicó en GitHub. ¡Gracias!",
+        "fr": "La suggestion a été publiée sur GitHub. Merci !",
+        "ja": "提案を GitHub に公開しました。ありがとうございます！",
+        "ko": "제안을 GitHub에 공개했습니다. 감사합니다!",
+        "zh": "建议已发布到 GitHub。谢谢！"
     },
     "bug_report_status_duplicate": {
         "ar": "يتطابق هذا مع تقرير موجود، لذا تم تحديث عدد مرات حدوثه. شكرًا لك!",
@@ -378,13 +378,13 @@
         "zh": "报告提交功能目前不可用。"
     },
     "bug_report_subtitle": {
-        "ar": "أرسل تقرير خطأ أو اقتراحًا بشكل خاص. تساعد تفاصيل النظام في تشخيص الأخطاء، وتُزال مسارات المجلد الشخصي قبل الرفع.",
-        "ca": "Envia un informe d'error o un suggeriment privat. Els detalls del sistema ajuden a diagnosticar errors; les rutes personals s'eliminen abans de pujar-lo.",
-        "es": "Envía un informe de error o una sugerencia de forma privada. Los datos del sistema ayudan a diagnosticar errores; las rutas personales se eliminan antes de subirlo.",
-        "fr": "Envoyez un rapport de bug ou une suggestion en privé. Les détails système facilitent le diagnostic ; les chemins personnels sont supprimés avant l'envoi.",
-        "ja": "非公開のバグレポートまたは提案を送信します。診断用のシステム情報に含まれる個人ホームパスは送信前に削除されます。",
-        "ko": "비공개 버그 보고서 또는 제안을 보냅니다. 진단용 시스템 정보에서 개인 홈 경로는 업로드 전에 제거됩니다.",
-        "zh": "私密发送错误报告或建议。系统信息有助于诊断错误，上传前会移除个人主目录路径。"
+        "ar": "انشر تقرير خطأ أو اقتراحًا عامًا على GitHub. تساعد تفاصيل النظام في التشخيص، وتُزال مسارات المجلد الشخصي قبل الرفع.",
+        "ca": "Publica un informe d'error o un suggeriment públic a GitHub. Els detalls del sistema ajuden al diagnòstic; les rutes personals s'eliminen abans de pujar-lo.",
+        "es": "Publica un informe de error o una sugerencia pública en GitHub. Los datos del sistema ayudan al diagnóstico; las rutas personales se eliminan antes de subirlo.",
+        "fr": "Publiez un rapport de bug ou une suggestion publique sur GitHub. Les détails système facilitent le diagnostic ; les chemins personnels sont supprimés avant l'envoi.",
+        "ja": "公開 GitHub Issue としてバグレポートまたは提案を送信します。個人ホームパスはアップロード前に削除されます。",
+        "ko": "공개 GitHub 이슈로 버그 보고서 또는 제안을 보냅니다. 개인 홈 경로는 업로드 전에 제거됩니다.",
+        "zh": "将错误报告或建议作为公开 GitHub 议题发布。上传前会移除个人主目录路径。"
     },
     "bug_report_title": {
         "ar": "تواصل معنا",

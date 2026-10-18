@@ -1021,49 +1021,49 @@
         "en": {
             "label": "Send Feedback",
             "tooltip": [
-                "Send a private bug report or suggestion with useful diagnostic details."
+                "Publish a bug report or suggestion to GitHub with useful diagnostic details."
             ]
         },
         "es": {
             "label": "Enviar comentarios",
             "tooltip": [
-                "Envía un informe privado de error o sugerencia con detalles de diagnóstico útiles."
+                "Publica en GitHub un informe de error o una sugerencia con detalles de diagnóstico útiles."
             ]
         },
         "fr": {
             "label": "Envoyer un commentaire",
             "tooltip": [
-                "Envoyez un rapport privé de bug ou une suggestion avec des détails de diagnostic utiles."
+                "Publiez sur GitHub un rapport de bug ou une suggestion avec des détails de diagnostic utiles."
             ]
         },
         "ca": {
             "label": "Enviar comentaris",
             "tooltip": [
-                "Envia un informe privat d'error o un suggeriment amb detalls de diagnòstic útils"
+                "Publica a GitHub un informe d'error o un suggeriment amb detalls de diagnòstic útils"
             ]
         },
         "zh": {
             "label": "发送反馈",
             "tooltip": [
-                "私密发送错误报告或建议，并附上有用的诊断信息"
+                "将错误报告或建议发布到 GitHub，并附上有用的诊断信息"
             ]
         },
         "ja": {
             "label": "フィードバックを送信",
             "tooltip": [
-                "診断に役立つ情報を添えて、非公開のバグ報告または提案を送信します"
+                "診断に役立つ情報を添えて、バグ報告または提案を GitHub に公開します"
             ]
         },
         "ko": {
             "label": "피드백 보내기",
             "tooltip": [
-                "유용한 진단 정보와 함께 비공개 버그 보고서 또는 제안을 보냅니다"
+                "유용한 진단 정보와 함께 버그 보고서 또는 제안을 GitHub에 공개합니다"
             ]
         },
         "ar": {
             "label": "إرسال ملاحظات",
             "tooltip": [
-                "إرسال تقرير خطأ أو اقتراح بشكل خاص مع تفاصيل تشخيصية مفيدة"
+                "انشر تقرير خطأ أو اقتراحًا على GitHub مع تفاصيل تشخيصية مفيدة"
             ]
         }
     },
