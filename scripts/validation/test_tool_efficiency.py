@@ -252,5 +252,54 @@ class AttributeSwitcherCancellationTests(unittest.TestCase):
         self.assertEqual(owner._write_decomposed_transform.call_count, 8)
 
 
+class SliderPinningTests(unittest.TestCase):
+    def setUp(self):
+        self.methods = definitions(
+            "TheKeyMachine/ui/widgets/customWidgets.py",
+            {"_on_slider_mode_requested", "_is_pin_key_checked"},
+            {"QtCompat": SimpleNamespace(isValid=lambda widget: widget is not None)},
+            class_name="QFlatSectionWidget",
+        )
+
+    def test_permanent_mode_change_is_a_pin_swap(self):
+        source = SimpleNamespace()
+        target = SimpleNamespace(startModeTransition=Mock())
+        section = SimpleNamespace(
+            _tkm_slider_prefix="blend",
+            _widgets={"blend_smooth": source, "blend_rough": target},
+            _apply_widget_pin_states=Mock(),
+        )
+
+        self.methods["_on_slider_mode_requested"](section, source, "rough", False)
+
+        section._apply_widget_pin_states.assert_called_once_with(
+            {"blend_smooth": False, "blend_rough": True}
+        )
+        target.startModeTransition.assert_called_once_with()
+
+    def test_temporary_mode_preview_does_not_change_pins(self):
+        source = SimpleNamespace(setCurrentMode=Mock())
+        section = SimpleNamespace(
+            _tkm_slider_prefix="blend",
+            _widgets={"blend_smooth": source},
+            _apply_widget_pin_states=Mock(),
+        )
+
+        self.methods["_on_slider_mode_requested"](section, source, "rough", True)
+
+        source.setCurrentMode.assert_called_once_with("rough", temporary=True)
+        section._apply_widget_pin_states.assert_not_called()
+
+    def test_slider_pin_state_uses_visibility_like_a_toolbutton(self):
+        visible = SimpleNamespace(isHidden=lambda: False)
+        hidden = SimpleNamespace(isHidden=lambda: True)
+        section = SimpleNamespace(_widgets={"visible": visible, "hidden": hidden})
+        is_checked = self.methods["_is_pin_key_checked"]
+
+        self.assertTrue(is_checked(section, "visible"))
+        self.assertFalse(is_checked(section, "hidden"))
+        self.assertFalse(is_checked(section, "missing"))
+
+
 if __name__ == "__main__":
     unittest.main()
