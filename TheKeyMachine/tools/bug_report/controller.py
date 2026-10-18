@@ -71,6 +71,21 @@ _UNVERIFIED_SSL_CONTEXT = ssl.create_default_context()
 _UNVERIFIED_SSL_CONTEXT.check_hostname = False
 _UNVERIFIED_SSL_CONTEXT.verify_mode = ssl.CERT_NONE
 
+
+def _open_relay_request(request, timeout=10):
+    """Use verified TLS, with the narrow macOS/Maya compatibility fallback."""
+    try:
+        return urllib.request.urlopen(request, timeout=timeout)
+    except (urllib.error.URLError, ssl.SSLCertVerificationError) as exc:
+        reason = getattr(exc, "reason", exc)
+        if sys.platform != "darwin" or not isinstance(reason, ssl.SSLCertVerificationError):
+            raise
+        return urllib.request.urlopen(
+            request,
+            context=_UNVERIFIED_SSL_CONTEXT,
+            timeout=timeout,
+        )
+
 # Reports this machine has actually sent, so the Help menu can list them and
 # let the artist check on one later (has the maintainer closed it yet?).
 # Kept client-side only -- the relay has no concept of "who sent this".
@@ -468,7 +483,7 @@ def _fetch_bug_report_status(fingerprint, report_type="bug"):
         },
         method="GET",
     )
-    with urllib.request.urlopen(request, context=_UNVERIFIED_SSL_CONTEXT, timeout=10) as response:
+    with _open_relay_request(request) as response:
         return json.loads(response.read().decode("utf-8"))
 
 
@@ -828,7 +843,7 @@ def submit_bug_report(**payload):
             },
             method="POST",
         )
-        with urllib.request.urlopen(request, context=_UNVERIFIED_SSL_CONTEXT, timeout=10) as response:
+        with _open_relay_request(request) as response:
             result = json.loads(response.read().decode("utf-8"))
         if not result.get("success"):
             raise RuntimeError(result.get("error") or "Relay rejected the report")

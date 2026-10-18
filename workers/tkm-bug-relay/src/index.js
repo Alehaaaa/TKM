@@ -2,7 +2,7 @@
 // other than letting us confirm from the outside (via /health) that a given
 // deploy actually reached the edge, since Worker responses otherwise carry no
 // build identifier.
-const RELAY_BUILD = "tkm-repo-migration-v3-2026-10-18";
+const RELAY_BUILD = "tkm-relay-hardening-v4-2026-10-18";
 
 const MAX_BODY_BYTES = 64 * 1024;
 // 5/hour turned out too tight even for one person iterating on this feature,
@@ -164,7 +164,7 @@ export default {
       if (!report.explanation) {
         return json({ error: "Explanation is required" }, 400);
       }
-      if (!/^[a-f0-9-]{32,40}$/i.test(report.installation_id)) {
+      if (!/^[a-f0-9]{8}(?:-[a-f0-9]{4}){3}-[a-f0-9]{12}$/i.test(report.installation_id)) {
         return json({ error: "Invalid installation identifier" }, 400);
       }
 
@@ -187,6 +187,7 @@ export default {
         report.report_type,
         await sha256(clusterFingerprintSource(fingerprintSource)),
       );
+      const useFuzzyCluster = shouldUseFuzzyCluster(report);
 
       // Exact hash first (cheap, precise); fall back to the fuzzy cluster key
       // so near-identical tracebacks that differ only in message/identifier
@@ -194,7 +195,7 @@ export default {
       // theoretically collide across unrelated bugs, so it is only ever a
       // fallback, never preferred over an exact hit.
       let existing = await env.REPORTS.get(exactKey, { type: "json" });
-      if (!existing) {
+      if (!existing && useFuzzyCluster) {
         existing = await env.REPORTS.get(clusterKey, { type: "json" });
       }
       const token = await githubInstallationToken(env);
@@ -221,7 +222,9 @@ export default {
             report_type: report.report_type,
           });
           await env.REPORTS.put(exactKey, record, { expirationTtl: DEDUPE_TTL_SECONDS });
-          await env.REPORTS.put(clusterKey, record, { expirationTtl: DEDUPE_TTL_SECONDS });
+          if (useFuzzyCluster) {
+            await env.REPORTS.put(clusterKey, record, { expirationTtl: DEDUPE_TTL_SECONDS });
+          }
           return json({
             success: true,
             duplicate: true,
@@ -231,7 +234,7 @@ export default {
         } catch (error) {
           if (!isDeletedGithubIssue(error)) throw error;
           await env.REPORTS.delete(exactKey);
-          await env.REPORTS.delete(clusterKey);
+          if (useFuzzyCluster) await env.REPORTS.delete(clusterKey);
         }
       }
 
@@ -244,7 +247,9 @@ export default {
         report_type: report.report_type,
       });
       await env.REPORTS.put(exactKey, record, { expirationTtl: DEDUPE_TTL_SECONDS });
-      await env.REPORTS.put(clusterKey, record, { expirationTtl: DEDUPE_TTL_SECONDS });
+      if (useFuzzyCluster) {
+        await env.REPORTS.put(clusterKey, record, { expirationTtl: DEDUPE_TTL_SECONDS });
+      }
       return json({
         success: true,
         duplicate: false,
@@ -445,9 +450,21 @@ export function clusterFingerprintSource(normalizedValue) {
 
 export function reportVersionKey(report) {
   const system = (report && report.system) || {};
-  const tkm = system.tkm_version || "unknown";
-  const maya = system.maya_version || "unknown";
+  const tkm = versionKeyPart(system.tkm_version);
+  const maya = versionKeyPart(system.maya_version);
   return `${tkm}|${maya}`;
+}
+
+function versionKeyPart(value) {
+  return String(value || "unknown").replace(/[|\r\n]+/g, " ").trim().slice(0, 100) || "unknown";
+}
+
+function escapeMarkdown(value) {
+  return String(value || "").replace(/([\\`*_{}\[\]()<>#+!|>~])/g, "\\$1");
+}
+
+export function shouldUseFuzzyCluster(report) {
+  return report.report_type === "bug" && Boolean(report.script_error);
 }
 
 export function versionsBlock(versions) {
@@ -455,7 +472,7 @@ export function versionsBlock(versions) {
   if (!entries.length) return "_No version data yet._";
   const lines = entries.map(([key, count]) => {
     const [tkm, maya] = key.split("|");
-    return `- TKM ${tkm} / Maya ${maya}: **${count}**`;
+    return `- TKM ${escapeMarkdown(tkm)} / Maya ${escapeMarkdown(maya)}: **${count}**`;
   });
   return ["**Seen on:**", ...lines].join("\n");
 }
@@ -544,7 +561,7 @@ async function updateOccurrenceCount(env, token, issueNumber, count, versions, r
     await githubFetch(env, token, `/issues/${issueNumber}/comments`, {
       method: "POST",
       body: JSON.stringify({
-        body: `Recurred on TKM ${tkm} / Maya ${maya} after this was closed (occurrence ${count}). Reopening as a regression.`,
+        body: `Recurred on TKM ${escapeMarkdown(tkm)} / Maya ${escapeMarkdown(maya)} after this was closed (occurrence ${count}). Reopening as a regression.`,
       }),
     });
   }
@@ -559,7 +576,7 @@ export function issueTitle(report) {
 
 export function issueBody(report, fingerprint, versions) {
   const systemLines = Object.entries(report.system)
-    .map(([key, value]) => `- **${key}:** ${value.replace(/\n/g, " ")}`)
+    .map(([key, value]) => `- **${key}:** ${escapeMarkdown(value.replace(/\n/g, " "))}`)
     .join("\n");
   const meta = reportTypeMeta(report);
   const safeError = (report.script_error || meta.fallbackContext).replace(/```/g, "''' ");
@@ -575,12 +592,12 @@ export function issueBody(report, fingerprint, versions) {
     "<!-- tkm-versions:end -->",
     "",
     "## Reporter",
-    report.name || "Anonymous",
+    escapeMarkdown(report.name || "Anonymous"),
     "",
     `Type: **${meta.titlePrefix}**`,
     "",
     `## ${meta.heading}`,
-    report.explanation,
+    escapeMarkdown(report.explanation),
     "",
     `## ${meta.contextHeading}`,
     "```text",

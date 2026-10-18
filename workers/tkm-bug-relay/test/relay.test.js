@@ -16,6 +16,7 @@ import worker, {
   normalizeFingerprintSource,
   reportVersionKey,
   sanitizeReport,
+  shouldUseFuzzyCluster,
   versionsBlock,
 } from "../src/index.js";
 
@@ -126,6 +127,28 @@ test("suggestions get suggestion title prefix, body headings, and type metadata"
   ]);
 });
 
+test("public issue prose neutralizes Markdown links, images, headings, and HTML", () => {
+  const report = sanitizeReport({
+    installation_id: "12345678-1234-1234-1234-123456789abc",
+    name: "[Reporter](https://example.invalid)",
+    explanation: "# heading\n![tracking pixel](https://example.invalid/pixel)\n<b>html</b>",
+    script_error: "RuntimeError",
+    system: { maya_version: "2026 [link](https://example.invalid)" },
+  });
+  const body = issueBody(report, "abc123", { [reportVersionKey(report)]: 1 });
+  assert.doesNotMatch(body, /!\[tracking pixel\]\(/);
+  assert.doesNotMatch(body, /\[Reporter\]\(/);
+  assert.doesNotMatch(body, /<b>/);
+  assert.match(body, /\\!\\\[tracking pixel\\\]\\\(/);
+  assert.match(body, /\\<b\\>/);
+});
+
+test("only bugs with traceback context use fuzzy clustering", () => {
+  assert.equal(shouldUseFuzzyCluster({ report_type: "bug", script_error: "RuntimeError" }), true);
+  assert.equal(shouldUseFuzzyCluster({ report_type: "bug", script_error: "" }), false);
+  assert.equal(shouldUseFuzzyCluster({ report_type: "suggestion", script_error: "context" }), false);
+});
+
 test("auto-detected component labels are included with the type labels", () => {
   const report = sanitizeReport({
     installation_id: "12345678-1234-1234-1234-123456789abc",
@@ -215,6 +238,13 @@ test("version key groups occurrences by TKM + Maya version", () => {
     system: { tkm_version: "0.1.99", maya_version: "2026" },
   });
   assert.equal(reportVersionKey(report), "0.1.99|2026");
+});
+
+test("version keys cannot inject separators or newlines", () => {
+  assert.equal(
+    reportVersionKey({ system: { tkm_version: "1.0|forged", maya_version: "2026\nextra" } }),
+    "1.0 forged|2026 extra",
+  );
 });
 
 test("versions block renders a sorted, human-readable table", () => {

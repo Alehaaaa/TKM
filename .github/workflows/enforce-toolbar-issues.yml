@@ -21,7 +21,7 @@ jobs:
             const issue = context.issue;
             await github.rest.issues.createComment({
               ...issue,
-              body: 'TKM issues are collected from Maya so reports include the diagnostic context needed to investigate them. Please use **Get in Touch** in the TheKeyMachine toolbar.'
+              body: 'TKM issues are collected from Maya so reports include the diagnostic context needed to investigate them. Please use **Get in Touch** from the TheKeyMachine toolbar.'
             });
             await github.rest.issues.update({
               ...issue,
