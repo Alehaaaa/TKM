@@ -14,6 +14,7 @@ except ImportError:
     om = None
 
 from TheKeyMachine.data.colors import COLORS
+from TheKeyMachine.core import settings
 from TheKeyMachine.maya import animation, maya_api
 from TheKeyMachine.tools.sliders import (
     curve_writer,
@@ -21,6 +22,37 @@ from TheKeyMachine.tools.sliders import (
     session as slider_session,
     targeting,
 )
+
+
+ALGORITHM_CUSTOM = "custom"
+ALGORITHM_MAYA_NATIVE = "maya_native"
+SMOOTH_ALGORITHM_SETTING = "slider_smooth_algorithm"
+SIMPLIFY_ALGORITHM_SETTING = "slider_simplify_algorithm"
+
+
+def _algorithm_setting(key):
+    value = settings.get_setting(key, ALGORITHM_CUSTOM)
+    return value if value in (ALGORITHM_CUSTOM, ALGORITHM_MAYA_NATIVE) else ALGORITHM_CUSTOM
+
+
+def get_smooth_algorithm():
+    return _algorithm_setting(SMOOTH_ALGORITHM_SETTING)
+
+
+def set_smooth_algorithm(value):
+    value = value if value in (ALGORITHM_CUSTOM, ALGORITHM_MAYA_NATIVE) else ALGORITHM_CUSTOM
+    settings.set_setting(SMOOTH_ALGORITHM_SETTING, value)
+    return value
+
+
+def get_simplify_algorithm():
+    return _algorithm_setting(SIMPLIFY_ALGORITHM_SETTING)
+
+
+def set_simplify_algorithm(value):
+    value = value if value in (ALGORITHM_CUSTOM, ALGORITHM_MAYA_NATIVE) else ALGORITHM_CUSTOM
+    settings.set_setting(SIMPLIFY_ALGORITHM_SETTING, value)
+    return value
 
 
 def _ensure_curve_value_cache(session, curve, keys):
@@ -118,6 +150,120 @@ def _apply_value(session, curve, time, value):
     curve_writer.write_curve_value(session, curve, time, value, create=True, allow_command_fallback=True)
 
 
+def _native_filter_shape(
+    curve, start_time, end_time, filter_name, amount, source_values=None
+):
+    """Evaluate a Maya-native filter on a connected throwaway curve.
+
+    Native filters only evaluate connected animCurves. Keeping the temporary
+    graph out of Maya's undo queue lets interactive slider previews use the
+    native result while the real curve remains owned by the slider's normal
+    MAnimCurveChange/undo lifecycle.
+    """
+    all_times = sorted(set(float(value) for value in (
+        cmds.keyframe(curve, query=True, timeChange=True) or []
+    )))
+    if not all_times:
+        return {}
+    source_shape = animation.capture_curve_shape([curve], all_times).get(curve, {})
+    for time, value in (source_values or {}).items():
+        if float(time) in source_shape:
+            source_shape[float(time)]["value"] = value
+    curve_type = cmds.nodeType(curve)
+    attribute_type = {
+        "animCurveTA": "doubleAngle",
+        "animCurveTL": "doubleLinear",
+        "animCurveTT": "time",
+    }.get(curve_type, "double")
+    undo_enabled = bool(cmds.undoInfo(query=True, state=True))
+    temporary_curve = None
+    sink = None
+    try:
+        cmds.undoInfo(stateWithoutFlush=False)
+        temporary_curve = cmds.createNode(curve_type, name="tkmNativeFilterCurve#")
+        sink = cmds.createNode("network", name="tkmNativeFilterSink#")
+        cmds.addAttr(sink, longName="input", attributeType=attribute_type)
+        cmds.connectAttr(
+            "{}.output".format(temporary_curve),
+            "{}.input".format(sink),
+            force=True,
+        )
+        animation.apply_curve_shape({temporary_curve: source_shape})
+        if filter_name == "gaussian":
+            cmds.filterCurve(
+                temporary_curve,
+                filter="gaussian",
+                startTime=float(start_time),
+                endTime=float(end_time),
+                selectedKeys=False,
+                width=max(0.001, 3.0 * float(amount)),
+                sampleCount=8,
+            )
+        else:
+            cmds.simplify(
+                temporary_curve,
+                time=(float(start_time), float(end_time)),
+                includeUpperBound=True,
+                timeTolerance=0.05 * float(amount),
+                valueTolerance=0.01 * float(amount),
+            )
+        filtered_times = cmds.keyframe(
+            temporary_curve,
+            query=True,
+            timeChange=True,
+        ) or []
+        return animation.capture_curve_shape(
+            [temporary_curve], filtered_times
+        ).get(temporary_curve, {})
+    finally:
+        if temporary_curve or sink:
+            try:
+                cmds.delete([node for node in (temporary_curve, sink) if node])
+            except Exception:
+                pass
+        cmds.undoInfo(stateWithoutFlush=undo_enabled)
+
+
+def _apply_native_smooth(session, curve, keys, amount):
+    original_values = _cached_curve_values(session, curve, keys)
+    shape = _native_filter_shape(
+        curve,
+        min(keys),
+        max(keys),
+        "gaussian",
+        amount,
+        source_values=original_values,
+    )
+    for time in keys:
+        sample = shape.get(float(time)) or {}
+        if sample.get("value") is not None:
+            _apply_value(session, curve, float(time), sample["value"])
+
+
+def _apply_native_simplify(session, curve, keys, amount):
+    shape = _native_filter_shape(curve, min(keys), max(keys), "simplify", amount)
+    surviving = {float(time) for time in shape if min(keys) <= float(time) <= max(keys)}
+    removed = [float(time) for time in keys if float(time) not in surviving]
+    if session.preview and session.anim_change is not None:
+        curve_fn = maya_api.anim_curve_fn(curve)
+        for time in reversed(removed):
+            maya_api.remove_anim_curve_key(curve_fn, time, change=session.anim_change)
+        animation.apply_curve_shape(
+            {curve: {time: shape[time] for time in surviving}},
+            set_values=True,
+            change=session.anim_change,
+            preserve_tangent_types=True,
+        )
+        return
+    for time in removed:
+        cmds.cutKey(curve, time=(time, time), clear=True)
+    animation.apply_curve_shape(
+        {curve: {time: shape[time] for time in surviving}},
+        set_values=True,
+        preserve_tangent_types=True,
+    )
+
+
 def _curve_default_value(curve):
     try:
         output = cmds.listConnections(f"{curve}.output", source=False, destination=True, plugs=True) or []
@@ -144,6 +290,11 @@ def apply_smooth(session, curves=None, factor=1.0):
     for curve in resolved_curves:
         keys = target_times_per_curve.get(curve, [])
         if not keys:
+            continue
+
+        if get_smooth_algorithm() == ALGORITHM_MAYA_NATIVE:
+            if factor > 0.0:
+                _apply_native_smooth(session, curve, keys, factor)
             continue
 
         original_data = _cached_curve_values(session, curve, keys)
@@ -479,6 +630,11 @@ def apply_simplify(session, curves, amount):
     for curve in resolved_curves:
         keys = sorted(set(float(time) for time in affected_map.get(curve, [])))
         if len(keys) <= 2:
+            continue
+
+        if get_simplify_algorithm() == ALGORITHM_MAYA_NATIVE:
+            if amount > 0.0:
+                _apply_native_simplify(session, curve, keys, amount)
             continue
 
         priority_cache_key = (curve, "simplify_detail_priority", tuple(keys))

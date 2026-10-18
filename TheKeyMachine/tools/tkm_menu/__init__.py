@@ -2,6 +2,7 @@ from functools import partial
 
 from TheKeyMachine.tools.registry import ToolObject, load_tooltips
 from TheKeyMachine.tools.tkm_menu import api
+from TheKeyMachine.tools.slider_blend import api as slider_blend_api
 
 TOOLTIPS = load_tooltips(__file__)
 
@@ -32,6 +33,38 @@ class TkmMenuToolObject(ToolObject):
                             "toolbar_add_shelf_button",
                             {"type": "check", "command": "start_with_maya"},
                             {"type": "check", "command": "show_tooltips"},
+                            {
+                                "type": "menu",
+                                "label": "Slider Algorithms",
+                                "icon": "slider_blend/connect_neighbors",
+                                "description": "Choose custom or Maya-native smoothing and simplification.",
+                                "items": [
+                                    {
+                                        "type": "section",
+                                        "label": "Smooth",
+                                    },
+                                    {
+                                        "type": "choice",
+                                        "id": "slider_smooth_algorithm",
+                                        "setting_label": "Smooth Algorithm",
+                                        "get_value": slider_blend_api.get_smooth_algorithm,
+                                        "set_value": slider_blend_api.set_smooth_algorithm,
+                                        "items": slider_blend_api.algorithm_choices,
+                                    },
+                                    {
+                                        "type": "section",
+                                        "label": "Simplify",
+                                    },
+                                    {
+                                        "type": "choice",
+                                        "id": "slider_simplify_algorithm",
+                                        "setting_label": "Simplify Algorithm",
+                                        "get_value": slider_blend_api.get_simplify_algorithm,
+                                        "set_value": slider_blend_api.set_simplify_algorithm,
+                                        "items": slider_blend_api.algorithm_choices,
+                                    },
+                                ],
+                            },
                             "separator",
                             {
                                 "type": "menu",
