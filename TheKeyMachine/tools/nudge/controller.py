@@ -402,35 +402,24 @@ def nudge_range(direction, tool_operation=None):
                 return
             operation.set_total(len(curve_times))
             edited_any = False
-            if len(curve_times) == len(selected_curve_times):
-                def _move_active_keyset():
-                    try:
-                        cmds.keyframe(
-                            edit=True,
-                            animation="keys",
-                            relative=True,
-                            option="over",
-                            timeChange=offset,
-                        )
-                    except _COMMAND_ERRORS:
-                        return False
-                    return True
-
-                edited_any = operation.run_on_main(_move_active_keyset)
-                operation.step(len(curve_times))
-            else:
-                for curve, key_times in curve_times.items():
-                    if operation.cancelled:
-                        return
-                    edited_any = _edit_keyframe_batches(
-                        operation,
-                        [curve],
-                        time=[(time, time) for time in sorted(set(key_times))],
-                        relative=True,
-                        includeUpperBound=True,
-                        option="over",
-                        timeChange=offset,
-                    ) or edited_any
+            # Never edit Maya's implicit global active keyset here. It may
+            # still contain a selected animation-layer weight curve that the
+            # edit filter deliberately removed (for example because the
+            # layer's weight plug is locked), making the whole command fail
+            # with "Cannot move keys". Address only the explicit, verified
+            # curve/time pairs.
+            for curve, key_times in curve_times.items():
+                if operation.cancelled:
+                    return
+                edited_any = _edit_keyframe_batches(
+                    operation,
+                    [curve],
+                    time=[(time, time) for time in sorted(set(key_times))],
+                    relative=True,
+                    includeUpperBound=True,
+                    option="over",
+                    timeChange=offset,
+                ) or edited_any
             if edited_any:
                 _snap_nudged_keys(
                     operation,
