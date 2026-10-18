@@ -176,5 +176,81 @@ class AlignTests(unittest.TestCase):
         cmds.keyframe.assert_not_called()
 
 
+class AttributeSwitcherCancellationTests(unittest.TestCase):
+    def test_position_capture_stops_after_cancelled_batch(self):
+        class Operation:
+            cancelled = False
+            def run_on_main(self, callback, *args): return callback(*args)
+            def set_status(self, _status): return self
+            def step(self, amount=1): self.cancelled = True
+
+        operation = Operation()
+        matrix = Mock(return_value="matrix")
+        tool_common = SimpleNamespace(current_tool_operation=lambda: operation)
+        chunks = definitions(
+            "TheKeyMachine/tools/attribute_switcher/controller.py", {"_chunks"},
+            {"APPLY_BATCH_SIZE": 8},
+        )["_chunks"]
+        ns = definitions(
+            "TheKeyMachine/tools/attribute_switcher/controller.py",
+            {"_prepare_frame_scoped"},
+            {
+                "APPLY_BATCH_SIZE": 8,
+                "_chunks": chunks,
+                "toolCommon": tool_common,
+                "maya_api": SimpleNamespace(world_matrix_at_time=matrix),
+            },
+            class_name="AttributeSwitcherController",
+        )
+        owner = SimpleNamespace()
+        owner._on_main = MethodType(
+            lambda _self, op, callback, *args: op.run_on_main(callback, *args), owner
+        )
+        owner._current_time = lambda: 1
+        targets = ["control{}".format(index) for index in range(20)]
+        result = ns["_prepare_frame_scoped"](
+            owner,
+            targets,
+            True,
+            owns_progress=False,
+            keyframes={1: targets},
+        )
+        self.assertFalse(result["complete"])
+        self.assertEqual(matrix.call_count, 8)
+
+    def test_super_mode_apply_stops_before_next_cancelled_batch(self):
+        class Operation:
+            cancelled = False
+            def run_on_main(self, callback, *args): return callback(*args)
+            def step(self, amount=1): self.cancelled = True
+
+        operation = Operation()
+        chunks = definitions(
+            "TheKeyMachine/tools/attribute_switcher/controller.py", {"_chunks"},
+            {"APPLY_BATCH_SIZE": 8},
+        )["_chunks"]
+        ns = definitions(
+            "TheKeyMachine/tools/attribute_switcher/controller.py",
+            {"_apply_super_switch"},
+            {"APPLY_BATCH_SIZE": 8, "_chunks": chunks},
+            class_name="AttributeSwitcherController",
+        )
+        owner = SimpleNamespace()
+        owner._on_main = MethodType(
+            lambda _self, op, callback, *args: op.run_on_main(callback, *args), owner
+        )
+        owner._compute_super_switch = Mock(
+            return_value={"translate": (0, 0, 0), "rotate": (0, 0, 0), "scale": (1, 1, 1)}
+        )
+        owner._write_decomposed_transform = Mock()
+        targets = {"control{}".format(index) for index in range(20)}
+        transforms = {1: {target: "matrix" for target in targets}}
+        ns["_apply_super_switch"](
+            owner, targets, "space", 1, {}, transforms, operation
+        )
+        self.assertEqual(owner._compute_super_switch.call_count, 8)
+        self.assertEqual(owner._write_decomposed_transform.call_count, 8)
+
+
 if __name__ == "__main__":
     unittest.main()
