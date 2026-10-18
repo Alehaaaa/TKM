@@ -44,6 +44,7 @@ test("report text is bounded, mentions are neutralized, and unknown fields are d
   assert.equal(report.name, "@\u200bmaintainer");
   assert.equal(report.explanation.length, 1200);
   assert.equal(report.report_type, "suggestion");
+  assert.equal(report.public_issue_disclosure_shown, false);
   assert.deepEqual(report.system, { maya_version: "2026" });
 });
 
@@ -52,6 +53,29 @@ test("report type accepts only the supported ticket types", () => {
   assert.equal(normalizeReportType("Suggestion"), "suggestion");
   assert.equal(normalizeReportType("feature"), "bug");
   assert.equal(normalizeReportType(undefined), "bug");
+});
+
+test("report endpoint refuses clients that still describe submissions as private", async () => {
+  const response = await worker.fetch(
+    new Request("https://relay.example/report", {
+      method: "POST",
+      body: JSON.stringify({
+        installation_id: "12345678-1234-1234-1234-123456789abc",
+        explanation: "Should not become public without updated disclosure",
+      }),
+    }),
+    {
+      GITHUB_APP_ID: "1",
+      GITHUB_INSTALLATION_ID: "1",
+      GITHUB_PRIVATE_KEY: "key",
+      GITHUB_OWNER: "owner",
+      GITHUB_REPO: "repo",
+      RATE_LIMIT_SALT: "salt",
+      REPORTS: createMockKv(),
+    },
+  );
+  assert.equal(response.status, 409);
+  assert.match((await response.json()).error, /public issue tracker/);
 });
 
 test("fingerprints ignore volatile paths, line numbers, addresses, and numbers", () => {
@@ -399,6 +423,7 @@ test("report submission recreates an issue when a stale duplicate points to a de
         },
         body: JSON.stringify({
           installation_id: "12345678-1234-1234-1234-123456789abc",
+          public_issue_disclosure_shown: true,
           explanation,
           report_type: "bug",
         }),

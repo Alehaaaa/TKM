@@ -360,6 +360,9 @@ def prepare_bug_report_payload(name, explanation, script_error, report_type="bug
     fingerprint = _local_fingerprint(script_error or explanation)
     payload = {
         "installation_id": _installation_id(),
+        # Protocol guard: the relay refuses older clients whose UI still
+        # described submissions as private now that TKM issues are public.
+        "public_issue_disclosure_shown": True,
         "name": _redact_home_path(name),
         "explanation": _redact_home_path(explanation),
         "script_error": _redact_home_path(script_error),

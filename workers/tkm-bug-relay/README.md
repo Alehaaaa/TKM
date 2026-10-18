@@ -42,6 +42,11 @@ The repository's issue chooser intentionally offers no GitHub issue form. A
 workflow closes and locks issues that do not carry one of the trusted
 `source:*` labels applied atomically by this Worker.
 
+The Worker requires `public_issue_disclosure_shown: true`. Updated toolbar
+clients set it only alongside UI copy that explains reports become public
+GitHub issues. Older clients are rejected and retain their existing local-file
+fallback instead of silently publishing a report they described as private.
+
 KV report, cluster, label, and installation-token caches are namespaced by
 their repository or installation. This is required when reusing the original
 `REPORTS` namespace: records containing issue numbers from `TKM-bug-inbox`

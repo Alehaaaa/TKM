@@ -2,7 +2,7 @@
 // other than letting us confirm from the outside (via /health) that a given
 // deploy actually reached the edge, since Worker responses otherwise carry no
 // build identifier.
-const RELAY_BUILD = "tkm-repo-migration-v2-2026-10-18";
+const RELAY_BUILD = "tkm-repo-migration-v3-2026-10-18";
 
 const MAX_BODY_BYTES = 64 * 1024;
 // 5/hour turned out too tight even for one person iterating on this feature,
@@ -158,6 +158,9 @@ export default {
       }
 
       const report = sanitizeReport(input);
+      if (!report.public_issue_disclosure_shown) {
+        return json({ error: "Update TKM before publishing reports to the public issue tracker" }, 409);
+      }
       if (!report.explanation) {
         return json({ error: "Explanation is required" }, 400);
       }
@@ -370,6 +373,7 @@ export function sanitizeReport(input) {
   input = input && typeof input === "object" ? input : {};
   const report = {
     installation_id: cleanText(input.installation_id, 40),
+    public_issue_disclosure_shown: input.public_issue_disclosure_shown === true,
     name: cleanText(input.name, TEXT_LIMITS.name),
     explanation: cleanText(input.explanation, TEXT_LIMITS.explanation),
     script_error: cleanText(input.script_error, TEXT_LIMITS.script_error),
