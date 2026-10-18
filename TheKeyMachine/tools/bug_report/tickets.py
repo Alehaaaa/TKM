@@ -92,7 +92,7 @@ def update_issue(token, issue_number, status, cancelled=lambda: False):
         raise RuntimeError("Set TKM_TICKETS_TOKEN in TheKeyMachine/.env to edit tickets.")
     if status not in _STATUS_ACTIONS or isinstance(issue_number, bool) or int(issue_number) <= 0:
         raise ValueError("Invalid ticket or status.")
-    url = "https://api.github.com/repos/Alehaaaa/TKM-bug-inbox/issues/{}".format(int(issue_number))
+    url = "https://api.github.com/repos/Alehaaaa/TKM/issues/{}".format(int(issue_number))
     headers = {"Authorization": "Bearer " + token, "Accept": "application/vnd.github+json",
                "User-Agent": "TheKeyMachine", "Content-Type": "application/json"}
     try:
@@ -123,19 +123,19 @@ def update_issue(token, issue_number, status, cancelled=lambda: False):
 def fetch_issues(token, cancelled=lambda: False):
     """Read every page, excluding pull requests. Never persist a partial fetch."""
     if not token:
-        raise RuntimeError("Set TKM_TICKETS_TOKEN in TheKeyMachine/.env to read the private inbox.")
+        raise RuntimeError("Set TKM_TICKETS_TOKEN in TheKeyMachine/.env to read TKM issues.")
     result = []
     page = 1
     while not cancelled():
         request = urllib.request.Request(
-            "https://api.github.com/repos/Alehaaaa/TKM-bug-inbox/issues?state=all&sort=created&direction=desc&per_page=100&page={}".format(page),
+            "https://api.github.com/repos/Alehaaaa/TKM/issues?state=all&sort=created&direction=desc&per_page=100&page={}".format(page),
             headers={"Authorization": "Bearer " + token, "Accept": "application/vnd.github+json", "User-Agent": "TheKeyMachine"},
         )
         try:
             with _open_request(request) as response:
                 batch = json.loads(response.read().decode("utf-8"))
         except urllib.error.HTTPError as exc:
-            messages = {401: "The ticket token was rejected.", 403: "GitHub denied access or its rate limit was reached.", 404: "The token needs Issues read access to Alehaaaa/TKM-bug-inbox."}
+            messages = {401: "The ticket token was rejected.", 403: "GitHub denied access or its rate limit was reached.", 404: "The token needs Issues read access to Alehaaaa/TKM."}
             raise RuntimeError(messages.get(exc.code, "GitHub returned HTTP {}.".format(exc.code))) from None
         if not isinstance(batch, list):
             raise RuntimeError("GitHub returned an unexpected inbox response.")

@@ -6,5 +6,6 @@ desktop.ini
 .vscode/
 .gitignore
 .env
+node_modules/
 /TheKeyMachine/core/debug/
 tests/

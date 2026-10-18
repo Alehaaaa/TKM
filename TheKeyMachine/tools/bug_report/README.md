@@ -14,8 +14,12 @@ TKM_TICKETS_TOKEN=your_fine_grained_github_token
 ```
 
 The token requires **Issues: Read and write** permission for
-`Alehaaaa/TKM-bug-inbox`. It is used for authenticated GitHub reads and explicit status changes, never
+`Alehaaaa/TKM`. It is used for authenticated GitHub reads and explicit status changes, never
 stored in the ticket cache or sent to the bug-report relay.
+
+New reports are created only by the Maya toolbar through the Cloudflare Worker.
+The token described here belongs to the existing maintainer-only debug manager;
+it is not part of report submission and is never distributed with TKM.
 
 With the flag enabled, startup fetches all pages of issues in the background.
 Previously unseen open issues display a notification whose **Open ticket** button

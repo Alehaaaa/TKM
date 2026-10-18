@@ -1,0 +1,17 @@
+{
+  "name": "tkm-bug-relay",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "wrangler dev",
+    "deploy": "wrangler deploy",
+    "test": "node --test test/*.test.js"
+  },
+  "devDependencies": {
+    "wrangler": "^4.35.0"
+  },
+  "allowScripts": {
+    "workerd@1.20260831.1": true,
+    "esbuild@0.28.1": true
+  }
+}

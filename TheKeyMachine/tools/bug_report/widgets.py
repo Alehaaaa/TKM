@@ -256,12 +256,12 @@ class QFlatBugReportDialog(customDialogs.QFlatDialog):
         if self._show_report_type_buttons:
             text = i18n.tr(
                 "bug_report_subtitle",
-                "Send a private note, bug report, or suggestion. System details help with troubleshooting; personal home paths are removed before upload.",
+                "Create a public GitHub issue with your bug report or suggestion. System details help with troubleshooting; personal home paths are removed before upload.",
             )
         else:
             text = i18n.tr(
                 "bug_report_detected_subtitle",
-                "Send this private bug report with the detected details. Personal home paths are removed before upload.",
+                "Create a public GitHub issue with the detected details. Personal home paths are removed before upload.",
             )
         self._subtitle.setText(text)
 
@@ -513,9 +513,9 @@ class QFlatBugReportDialog(customDialogs.QFlatDialog):
                 self._set_status(
                     i18n.tr(
                         "bug_report_status_success_suggestion" if is_suggestion else "bug_report_status_success",
-                        "Suggestion sent privately. Thank you!"
+                        "Suggestion published to GitHub. Thank you!"
                         if is_suggestion
-                        else "Bug report sent privately. Thank you!",
+                        else "Bug report published to GitHub. Thank you!",
                     ),
                     error=False,
                 )

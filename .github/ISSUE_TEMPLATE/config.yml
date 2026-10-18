@@ -1,0 +1,5 @@
+blank_issues_enabled: false
+contact_links:
+  - name: Report from TheKeyMachine in Maya
+    url: https://github.com/Alehaaaa/TKM
+    about: Use Get in Touch in the TKM toolbar so the report includes the diagnostic context needed to investigate it.

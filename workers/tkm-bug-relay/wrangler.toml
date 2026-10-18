@@ -1,0 +1,12 @@
+name = "tkm-bug-relay"
+main = "src/index.js"
+compatibility_date = "2026-09-02"
+workers_dev = true
+
+[vars]
+GITHUB_OWNER = "Alehaaaa"
+GITHUB_REPO = "TKM"
+
+[[kv_namespaces]]
+binding = "REPORTS"
+id = "6f50ac0a55c9450fac8cb2bdd4bdc2eb"

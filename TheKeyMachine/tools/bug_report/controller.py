@@ -699,7 +699,7 @@ def reset_last_viewed_ticket_statuses():
     return len(entries)
 
 
-_BUG_REPORT_INBOX_REPO_URL = "https://github.com/Alehaaaa/TKM-bug-inbox"
+_BUG_REPORT_INBOX_REPO_URL = "https://github.com/Alehaaaa/TKM"
 
 
 def open_issue(issue_number):
