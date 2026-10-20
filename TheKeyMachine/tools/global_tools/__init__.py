@@ -16,6 +16,7 @@ class GlobalToolsToolObject(ToolObject):
             "icon": "euler_filter",
             "callback": api.toggle_euler_filter,
             "tooltip": TOOLTIPS["euler_filter"],
+            "keywords": ["auto rotation cleanup", "auto unwrap rotations"],
         },
         "overshoot_sliders": {
             "type": "setting",
@@ -25,6 +26,7 @@ class GlobalToolsToolObject(ToolObject):
             "icon": "sliders_overshoot",
             "callback": api.toggle_overshoot_sliders,
             "tooltip": TOOLTIPS["overshoot_sliders"],
+            "keywords": ["overshoot overshoot sliders", "overshoot sliders command"],
         },
         "custom_graph": {
             "type": "setting",
@@ -34,6 +36,7 @@ class GlobalToolsToolObject(ToolObject):
             "icon": "customGraph",
             "callback": api.toggle_graph_toolbar,
             "tooltip": TOOLTIPS["custom_graph"],
+            "keywords": ["curve editor toolbar", "fcurve editor toolbar"],
         },
     }
     SECTION = {

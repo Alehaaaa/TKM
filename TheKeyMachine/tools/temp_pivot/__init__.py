@@ -19,6 +19,7 @@ class TempPivotToolObject(ToolObject):
             "get_checked": api.is_temp_pivot_active, "set_checked": api.toggle,
             "bind_checked_fn": api.bind_temp_pivot_toolbar_button,
             "tooltip": TOOLTIPS["temp_pivot"],
+            "keywords": ["temporary transform pivot", "custom pivot"],
             "operation": {"undo": True, "rollback_on_cancel": True},
         },
         "temp_pivot_last_object": {
@@ -26,28 +27,34 @@ class TempPivotToolObject(ToolObject):
             "icon": "temp_pivot_last_object",
             "callback": api.create_last_object_temp_pivot,
             "tooltip": TOOLTIPS["last_object"], "pinnable": False,
+            "keywords": ["temporary transform pivot to last object", "custom pivot to last object"],
         },
         "temp_pivot_centered": {
             "type": "tool", "label": "Temp Pivot Centered", "icon": "temp_pivot",
             "callback": api.create_centered_temp_pivot, "tooltip": TOOLTIPS["centered"],
+            "keywords": ["temporary transform pivot centered", "custom pivot centered"],
         },
         "temp_pivot_worldspace": {
             "type": "tool", "label": "Temp Pivot WorldSpace",
             "icon": "temp_pivot_worldspace",
             "callback": api.create_worldspace_temp_pivot, "tooltip": TOOLTIPS["worldspace"],
+            "keywords": ["temporary transform pivot worldspace", "custom pivot worldspace"],
         },
         "temp_pivot_edit": {
             "type": "tool", "label": "Edit Temp Pivot", "icon": "temp_pivot_edit",
             "callback": api.edit_temp_pivot, "tooltip": TOOLTIPS["edit"],
+            "keywords": ["edit temporary transform pivot", "edit custom pivot"],
         },
         "temp_pivot_reset": {
             "type": "tool", "label": "Reset Temp Pivot", "icon": "temp_pivot_reset",
             "callback": api.reset_temp_pivot, "tooltip": TOOLTIPS["reset"],
+            "keywords": ["reset temporary transform pivot", "reset custom pivot"],
         },
         "temp_pivot_help": {
             "type": "tool", "label": "Help", "icon": "help",
             "callback": lambda: general.open_url(TempPivotToolObject.DOC_URL),
             "tooltip": TOOLTIPS["help"], "pinnable": False,
+            "keywords": ["temporary pivot documentation", "custom pivot guide"],
         },
     }
     SECTION = {

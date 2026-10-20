@@ -16,6 +16,7 @@ class PauseViewportToolObject(ToolObject):
             "set_checked": api.set_viewport_paused,
             "changed_signal": api.viewport_paused_changed_signal(),
             "tooltip": TOOLTIPS["pause_viewport"],
+            "keywords": ["freeze model panel", "suspend viewport refresh"],
             "menu": api.build_pause_viewport_context_menu,
         },
         "pause_viewport_auto": {
@@ -28,5 +29,6 @@ class PauseViewportToolObject(ToolObject):
             "set_checked": api.set_auto_pause_enabled,
             "changed_signal": api.auto_pause_changed_signal(),
             "tooltip": TOOLTIPS["pause_viewport_auto"],
+            "keywords": ["auto freeze model panel", "auto suspend viewport refresh"],
         },
     }

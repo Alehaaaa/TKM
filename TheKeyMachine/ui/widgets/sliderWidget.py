@@ -1337,6 +1337,18 @@ class QFlatSliderWidget(cw.TooltipMixin, QtWidgets.QWidget):
         """Called automatically by QFlatSectionWidget to establish a stable reference."""
         self._section_parent = section
         self._internal_key = key
+        # Resync a torn-off mode menu whenever a pin changes anywhere in the
+        # section (a mode swap is a pin swap), connected once per slider.
+        if (
+            section is not None
+            and hasattr(section, "pinsChanged")
+            and not getattr(self, "_mode_menu_sync_connected", False)
+        ):
+            try:
+                section.pinsChanged.connect(self._sync_mode_menu)
+                self._mode_menu_sync_connected = True
+            except (RuntimeError, TypeError):
+                pass
         # Extract operational prefix, e.g. "tween" from "tween_tweener"
         parts = key.split("_")
         if len(parts) > 1:
@@ -1376,6 +1388,7 @@ class QFlatSliderWidget(cw.TooltipMixin, QtWidgets.QWidget):
 
         menu = cw.MenuWidget(parent=self)
         menu.setTearOffEnabled(False)
+        menu._tkm_mode_actions = {}
         menu.addSection(i18n.tr("slider_mode_section", "Slider Mode"))
         group = QtGui.QActionGroup(menu)
         group.setExclusive(True)
@@ -1404,7 +1417,8 @@ class QFlatSliderWidget(cw.TooltipMixin, QtWidgets.QWidget):
             act.setActionGroup(group)
 
             is_current = active and (mode.key == active.key or mode.label == active.label)
-            act.setChecked(is_current)
+            act.setChecked(bool(is_current))
+            menu._tkm_mode_actions[mode.key] = act
 
             # Selecting a mode swaps a pin -- disable modes that are already
             # pinned (visible) on another slot of this section, the same
@@ -1415,10 +1429,13 @@ class QFlatSliderWidget(cw.TooltipMixin, QtWidgets.QWidget):
                     f"{self._section_prefix}_{mode.key}"
                 )
 
-            if is_already_pinned:
-                act.setEnabled(False)
+            act.setEnabled(not is_already_pinned)
 
-            if not is_current and not is_already_pinned:
+            # Connect every non-current mode, not only the ones enabled right
+            # now: a torn-off menu stays live (see _sync_mode_menu), so an
+            # action disabled this instant can be re-enabled later and must
+            # still act. Being disabled already blocks it from firing.
+            if not is_current:
                 def _select_mode(_checked=False, mode_key=mode.key):
                     self.modeSelected.emit(mode_key)
                     self.modeRequested.emit(self, mode_key, False)
@@ -1428,12 +1445,50 @@ class QFlatSliderWidget(cw.TooltipMixin, QtWidgets.QWidget):
         self._menu = menu
 
         def _release_menu(target=menu):
+            # A torn-off copy keeps living in its own window; only drop our
+            # reference and destroy the menu when it is not torn off, so a
+            # detached menu stays alive and keeps syncing.
+            if wutil.is_valid_widget(target) and target.isTearOffMenuVisible():
+                return
             if self._menu is target:
                 self._menu = None
             target.deleteLater()
 
         menu.aboutToHide.connect(_release_menu)
         menu.popup(self.mapToGlobal(pos))
+
+    def _sync_mode_menu(self, *args):
+        """Keep a torn-off mode menu current with the live mode/pin state.
+
+        Whenever a pin changes, the checked entry follows the current mode and
+        a mode already pinned on another slot of this section shows disabled.
+        Driven by the section's ``pinsChanged`` (connected in
+        ``on_added_to_section``), a mode swap or an external pin is reflected
+        without reopening.
+        """
+        menu = self._menu
+        if menu is None or not wutil.is_valid_widget(menu):
+            return
+        actions = getattr(menu, "_tkm_mode_actions", {})
+        if not actions:
+            return
+        active = self.currentMode()
+        section = self._section_parent
+        for mode_key, act in actions.items():
+            if not wutil.is_valid_widget(act):
+                continue
+            is_current = bool(active) and mode_key == active.key
+            blocked = act.blockSignals(True)
+            try:
+                act.setChecked(is_current)
+            finally:
+                act.blockSignals(blocked)
+            is_already_pinned = False
+            if section and self._section_prefix and hasattr(section, "_is_pin_key_checked"):
+                is_already_pinned = not is_current and section._is_pin_key_checked(
+                    "{}_{}".format(self._section_prefix, mode_key)
+                )
+            act.setEnabled(not is_already_pinned)
 
     ############### GEOMETRY MANAGER METHODS ###############
     def resizeEvent(self, e):

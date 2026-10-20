@@ -31,6 +31,11 @@ def set_auto_pause_enabled(enabled=False, *_args):
     return background_runner_api.set_pause_viewport_auto(enabled)
 
 
+def toggle_auto_pause(*_args):
+    """Flip automatic viewport pause -- used by the toolbar button's Alt-click."""
+    return set_auto_pause_enabled(not is_auto_pause_enabled())
+
+
 def auto_pause_changed_signal():
     return background_runner_service.changed_signal_for_runner(
         background_runner_service.AUTO_PAUSE_VIEWPORT_ID

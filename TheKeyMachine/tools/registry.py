@@ -9,7 +9,16 @@ from types import MappingProxyType
 
 
 class ToolObject(object):
-    """Declarative metadata owned by one tool package."""
+    """Declarative metadata owned by one tool package.
+
+    Each entry in ``TOOLS`` describes one command. Beyond the display keys
+    (``label``, ``icon``, ``tooltip``, ``callback`` ...), a tool may declare an
+    optional ``"keywords"`` list of search synonyms/aliases -- e.g.
+    ``"keywords": ["flip", "symmetry"]`` on Mirror. Search scores these the same
+    way it scores the title and command id, so a tool becomes findable by words
+    its label does not contain. The key is optional and language-independent;
+    omit it and the command is still found by its title and id.
+    """
 
     ORDER = 1000
     TOOLS = {}
@@ -857,31 +866,6 @@ def get_tool_tint_color(tool_id, default=None):
             if color is not None:
                 return color
     return default
-
-
-def group_sections_by_color(sections):
-    """Group *sections* (dicts with a ``"color"`` key) into runs of consecutive matching colors.
-
-    Returns a list of lists, each holding the original section dicts for one
-    contiguous same-color run, in their original order. Two sections of the
-    same color that are not adjacent produce two separate runs.
-
-    Used by the Workspaces editor to present -- and reorder -- whole color
-    runs as one unit instead of individual sections. The toolbar's own
-    inter-section spacing does *not* use this: it compares each *visible*
-    section's live color directly at layout time (see
-    ``customWidgets.QFlowLayout``), since a hidden (unpinned) section can drop
-    out of a run and change which sections actually end up adjacent.
-    """
-    groups = []
-    previous_color = object()
-    for section in sections:
-        color = section.get("color")
-        if not groups or color != previous_color:
-            groups.append([])
-        groups[-1].append(section)
-        previous_color = color
-    return groups
 
 
 def get_toolbar_sections(layout_id, resolve_items=True):

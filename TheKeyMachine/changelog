@@ -14,6 +14,14 @@
 # Rule: rephrase technical changes into animator-facing behavior when there is a visible effect.
 # Rule: keep entries broad and concise; include specifics only when needed to explain a bug.
 
+1.0.4:
+  - polish: Search understands descriptive aliases for every built-in tool and ranks complete multi-word matches more accurately
+  - polish: Workspaces groups toolbar sections by named colors while keeping each slider section together
+  - polish: Workspace pin rows use clearer icons and update in place when toolbar pins change
+  - bugfix: Pin All, Pin Defaults, and detached pin menus keep their checks and slider modes synchronized
+  - new: Pause Viewport indicates automatic pausing with a blinking icon and supports an Alt-click shortcut
+  - changed: Slider modes can be pinned and restored independently like regular toolbar tools
+
 1.0.3:
   - polish: Align, Default, Gimbal Fixer, Nudge, and key deletion process dense animation more efficiently
   - bugfix: Closing, unloading, reloading, or updating waits for active tool work instead of interrupting scene edits

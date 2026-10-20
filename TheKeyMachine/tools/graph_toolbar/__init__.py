@@ -11,9 +11,11 @@ class GraphToolbarToolObject(ToolObject):
         "graph_settings_menu": {
             "type": "menu", "label": "Graph Toolbar Settings", "icon": "settings",
             "callback": api.show_settings_menu, "tooltip": TOOLTIPS["settings_menu"],
+            "keywords": ["curve editor toolbar settings", "graph editor controls settings"],
         },
         "graph_dock_menu": {
             "type": "menu", "label": "Graph Toolbar Dock", "icon": "dock",
             "callback": api.show_dock_menu, "tooltip": TOOLTIPS["dock_menu"],
+            "keywords": ["curve editor toolbar dock", "graph editor controls dock"],
         },
     }

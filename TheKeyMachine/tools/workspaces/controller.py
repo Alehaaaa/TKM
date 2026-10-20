@@ -207,6 +207,7 @@ def get_sections(toolbar_id):
             "id": section_def["id"],
             "label": section_def.get("label") or section_def["id"],
             "color": section_def.get("color") or COLORS.toolbar.gray.hex,
+            "is_slider": section_def.get("type") == "slider",
         }
         for section_def in _toolbar_section_defs(toolbar_id)
         if section_def.get("hiddeable", True)
@@ -237,29 +238,63 @@ def reorder_sections(toolbar_id, new_order_ids):
             pass
 
 
-def get_color_groups(toolbar_id):
-    """Ordered color-group rows for the Workspaces editor.
+def _toolbar_color_name(hex_color):
+    """Human-readable name for a toolbar swatch, e.g. '#72DBB8' -> 'Green'."""
+    if not hex_color:
+        return "Color"
+    target = str(hex_color).lower()
+    from TheKeyMachine.data.colors import COLORS
 
-    Each row is one contiguous run of same-colored sections (see
-    ``registry.group_sections_by_color``), presented -- and reordered -- as one
-    atomic unit instead of individual sections. A group has no identity of
-    its own beyond "these section ids share a color run right now": it is
-    recomputed fresh from the current section order every time this is
-    called, so if reordering groups happens to land two same-colored runs
-    next to each other, they simply present as one merged group afterwards.
+    for name, color in vars(COLORS.toolbar).items():
+        if getattr(color, "hex", "").lower() == target:
+            return name.replace("_", " ").title()
+    return str(hex_color)
+
+
+def get_color_groups(toolbar_id):
+    """Color-group rows for the Workspaces editor: one row per distinct color.
+
+    Regular tool sections that share a color are collected into a single group
+    -- a color that appears in more than one place does not produce duplicate
+    rows -- ordered by where that color first appears, labelled by the color's
+    name. Reordering a group moves all of its sections together (see
+    ``reorder_color_groups``), so same-color sections stay contiguous.
+
+    Slider sections stay separate: each is its own group (labelled by its own
+    name), never merged into a color group, so a slider keeps its modes
+    together as one unit rather than being scattered among the colored tools.
     """
     sections = get_sections(toolbar_id)
     groups = []
-    for member_sections in registry.group_sections_by_color(sections):
-        section_ids = tuple(section["id"] for section in member_sections)
-        groups.append(
-            {
-                "id": "::".join(section_ids),
-                "color": member_sections[0]["color"],
-                "sections": member_sections,
-                "section_ids": section_ids,
-            }
-        )
+    index_by_color = {}
+    for section in sections:
+        if section.get("is_slider"):
+            groups.append(
+                {
+                    "id": section["id"],
+                    "color": section["color"],
+                    "name": section["label"],
+                    "sections": [section],
+                    "is_slider": True,
+                }
+            )
+            continue
+        color = section["color"]
+        position = index_by_color.get(color)
+        if position is None:
+            index_by_color[color] = len(groups)
+            groups.append(
+                {
+                    "id": color,
+                    "color": color,
+                    "name": _toolbar_color_name(color),
+                    "sections": [section],
+                }
+            )
+        else:
+            groups[position]["sections"].append(section)
+    for group in groups:
+        group["section_ids"] = tuple(section["id"] for section in group["sections"])
     return groups
 
 
@@ -268,12 +303,13 @@ def _color_groups_by_id(toolbar_id):
 
 
 def reorder_color_groups(toolbar_id, new_group_id_order):
-    """Persist a drag-and-drop reorder of whole color groups.
+    """Persist a drag-and-drop reorder of whole color groups (id == color).
 
-    Each group is flattened back to its member section ids (kept in their
-    existing relative order) before delegating to ``reorder_sections``, so
-    the persisted order is still a plain section-id sequence -- groups are
-    purely a presentation concept, not a stored one.
+    Each group flattens back to its member section ids (kept in their existing
+    relative order) before delegating to ``reorder_sections``, so same-color
+    sections become contiguous in the new order and the persisted order is
+    still a plain section-id sequence -- groups are a presentation concept,
+    not a stored one.
     """
     groups_by_id = _color_groups_by_id(toolbar_id)
     new_section_order = []

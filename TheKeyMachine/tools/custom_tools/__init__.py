@@ -16,6 +16,7 @@ class CustomToolsToolObject(ToolObject):
             "callback": api.show_menu,
             "menu": api.build_menu,
             "tooltip": TOOLTIPS["custom_tools"],
+            "keywords": ["custom custom tools", "custom tools command"],
         },
     }
     SECTION = {

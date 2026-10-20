@@ -20,6 +20,7 @@ class AttributeSwitcherToolObject(ToolObject):
             "set_checked": api.toggle_window,
             "bind_checked_fn": api.bind_attribute_switcher_toolbar_button,
             "tooltip": TOOLTIPS["attribute_switcher"],
+            "keywords": ["attribute attribute switcher", "attribute switcher command"],
         },
     }
     SECTION = {

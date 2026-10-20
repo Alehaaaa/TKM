@@ -14,6 +14,7 @@ class GraphToolsToolObject(ToolObject):
         "graph_extra_tools": {
             "type": "menu", "label": "Graph Extras", "text": "E",
             "tooltip": TOOLTIPS["extras"],
+            "keywords": ["graph tools graph extras", "graph extras command"],
             "menu": {"label": "Graph Extras", "items": [
                 "graph_select_object_from_curve", "graph_isolate_curves", "separator",
                 "graph_flip", "graph_overlap_forward", "graph_overlap_backward", "separator",
@@ -25,42 +26,52 @@ class GraphToolsToolObject(ToolObject):
             "type": "tool", "label": "Select Object from Curve", "icon": "isolate",
             "callback": api.select_objects_from_selected_curves,
             "tooltip": TOOLTIPS["select_object"],
+            "keywords": ["pick object from curve", "choose object from curve"],
         },
         "graph_isolate_curves": {
             "type": "tool", "label": "Isolate Curves", "icon": "isolate",
             "callback": api.isolate_curves, "tooltip": TOOLTIPS["isolate"],
+            "keywords": ["solo curves", "focus on curves"],
         },
         "graph_flip": {
             "type": "tool", "label": "Flip Curves", "text": "F",
             "callback": api.flip_curves, "tooltip": TOOLTIPS["flip"],
+            "keywords": ["flip fcurves", "flip animation curves"],
         },
         "graph_overlap_forward": {
             "type": "tool", "label": "Overlap Forward", "text": "O>",
             "callback": api.overlap_forward, "tooltip": TOOLTIPS["overlap"],
+            "keywords": ["graph tools overlap forward", "overlap forward command"],
         },
         "graph_overlap_backward": {
             "type": "tool", "label": "Overlap Backward", "text": "O<",
             "callback": api.overlap_backward, "tooltip": TOOLTIPS["overlap"],
+            "keywords": ["graph tools overlap backward", "overlap backward command"],
         },
         "graph_toggle_mute": {
             "type": "tool", "label": "Mute Curves", "text": "Mt",
             "callback": api.toggle_mute, "tooltip": TOOLTIPS["mute"],
+            "keywords": ["silence curves", "disable curves"],
         },
         "graph_toggle_lock": {
             "type": "tool", "label": "Lock Curves", "text": "Lk",
             "callback": api.toggle_lock, "tooltip": TOOLTIPS["lock"],
+            "keywords": ["protect curves", "freeze curves"],
         },
         "graph_match_keys": {
             "type": "tool", "label": "Match Curves", "text": "M", "icon": "align",
             "callback": api.match_keys, "tooltip": TOOLTIPS["match"],
+            "keywords": ["match fcurves", "match animation curves"],
         },
         "enable_graph_filter": {
             "type": "tool", "label": "Enable Graph Filter", "text": "EnF",
             "callback": api.enable_filter, "tooltip": TOOLTIPS["filter"],
+            "keywords": ["turn on graph filter", "activate graph filter"],
         },
         "disable_graph_filter": {
             "type": "tool", "label": "Disable Graph Filter", "text": "DiF",
             "callback": api.disable_filter, "tooltip": TOOLTIPS["filter"],
+            "keywords": ["turn off graph filter", "deactivate graph filter"],
         },
     }
     SECTION = {

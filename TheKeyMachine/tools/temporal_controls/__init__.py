@@ -63,6 +63,7 @@ class TemporalControlsToolObject(ToolObject):
             "icon": "temporal_controls",
             "callback": api.create_controls,
             "tooltip": TOOLTIPS["temporal_controls"],
+            "keywords": ["animation motion handles", "temporary animation controls"],
             "menu": {
                 "label": "Temporal Controls",
                 "icon": "temporal_controls",
@@ -95,6 +96,7 @@ class TemporalControlsToolObject(ToolObject):
             "operation": {"progress": False, "undo": False},
         },
         "temporal_controls_create_apply": {
+            "keywords": ["create animation motion handles", "create temporary animation controls"],
             "type": "tool",
             "label": "Create Temporal Controls",
             "callback": api.create_controls_with_options,
@@ -112,6 +114,7 @@ class TemporalControlsToolObject(ToolObject):
             "get_checked": api.is_super_mode_enabled,
             "set_checked": api.set_super_mode_enabled,
             "tooltip": TOOLTIPS["temporal_controls_super_mode"],
+            "keywords": ["temporal controls super super mode", "super mode command"],
             "operation": {"progress": False, "undo": False},
         },
         "temporal_controls_world_space": {
@@ -120,6 +123,7 @@ class TemporalControlsToolObject(ToolObject):
             "icon": "temporal_controls",
             "callback": api.switch_controls_to_world_space,
             "tooltip": TOOLTIPS["temporal_controls_world_space"],
+            "keywords": ["temporal global coordinates", "world-space animation controls"],
         },
         "temporal_controls_object_space": {
             "type": "tool",
@@ -127,6 +131,7 @@ class TemporalControlsToolObject(ToolObject):
             "icon": "temporal_controls",
             "callback": api.switch_controls_to_object_space,
             "tooltip": TOOLTIPS["temporal_controls_object_space"],
+            "keywords": ["local coordinates", "object coordinates"],
         },
         "temporal_controls_camera_space": {
             "type": "tool",
@@ -134,6 +139,7 @@ class TemporalControlsToolObject(ToolObject):
             "icon": "temporal_controls",
             "callback": api.switch_controls_to_camera_space,
             "tooltip": TOOLTIPS["temporal_controls_camera_space"],
+            "keywords": ["temporal camera coordinates", "view-space animation controls"],
         },
         "temporal_controls_relative_space": {
             "type": "tool",
@@ -141,6 +147,7 @@ class TemporalControlsToolObject(ToolObject):
             "icon": "temporal_controls",
             "callback": api.switch_controls_to_relative_space,
             "tooltip": TOOLTIPS["temporal_controls_relative_space"],
+            "keywords": ["temporal offset coordinates", "relative animation controls"],
         },
         "temporal_controls_child_space": {
             "type": "tool",
@@ -148,6 +155,7 @@ class TemporalControlsToolObject(ToolObject):
             "icon": "temporal_controls",
             "callback": api.switch_controls_to_child_space,
             "tooltip": TOOLTIPS["temporal_controls_child_space"],
+            "keywords": ["child coordinates", "hierarchy coordinates"],
         },
         "temporal_controls_mute_revert": {
             "type": "tool",
@@ -155,6 +163,7 @@ class TemporalControlsToolObject(ToolObject):
             "icon": "temporal_controls_mute_revert",
             "callback": api.mute_and_revert,
             "tooltip": TOOLTIPS["temporal_controls_mute_revert"],
+            "keywords": ["silence and revert", "disable and revert"],
         },
         "temporal_controls_toggle_rig": {
             "type": "tool",
@@ -162,6 +171,7 @@ class TemporalControlsToolObject(ToolObject):
             "icon": "temporal_controls",
             "callback": api.toggle_temporal_control_rigs,
             "tooltip": TOOLTIPS["temporal_controls_toggle_rig"],
+            "keywords": ["switch temporal control", "show or hide temporal control"],
         },
         "temporal_controls_mute_bake": {
             "type": "tool",
@@ -169,6 +179,7 @@ class TemporalControlsToolObject(ToolObject):
             "icon": "temporal_controls_mute_bake",
             "callback": api.mute_and_bake,
             "tooltip": TOOLTIPS["temporal_controls_mute_bake"],
+            "keywords": ["silence and bake", "disable and bake"],
         },
         "temporal_controls_bake": {
             "type": "tool",
@@ -176,6 +187,7 @@ class TemporalControlsToolObject(ToolObject):
             "icon": "temporal_controls_bake",
             "callback": api.bake_controls,
             "tooltip": TOOLTIPS["temporal_controls_bake"],
+            "keywords": ["delete and bake", "discard and bake"],
         },
         "temporal_controls_revert": {
             "type": "tool",
@@ -183,6 +195,7 @@ class TemporalControlsToolObject(ToolObject):
             "icon": "temporal_controls_revert",
             "callback": api.revert_controls,
             "tooltip": TOOLTIPS["temporal_controls_revert"],
+            "keywords": ["delete and revert", "discard and revert"],
         },
         "temporal_controls_panel": {
             "type": "tool",
@@ -190,6 +203,7 @@ class TemporalControlsToolObject(ToolObject):
             "icon": "temporal_controls_panel",
             "callback": api.open_temp_controls_panel,
             "tooltip": TOOLTIPS["temporal_controls_panel"],
+            "keywords": ["animation motion handles panel", "temporary animation controls panel"],
         },
     }
     SECTION = {

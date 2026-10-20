@@ -18,6 +18,7 @@ class AnimationOffsetToolObject(ToolObject):
             "get_checked": api.is_enabled,
             "set_checked": api.toggle,
             "tooltip": TOOLTIPS["animation_offset"],
+            "keywords": ["shift animation timing", "offset keyframes"],
             "operation": {"progress": False, "undo": False},
         }
     }

@@ -92,6 +92,7 @@ class TangentsToolObject(ToolObject):
             "type": "tool", "label": "Cycle Matcher", "text": "CM",
             "icon": "match_curve_cycle", "callback": api.match_cycle,
             "tooltip": TOOLTIPS["cycle"],
+            "keywords": ["tangent cycle cycle matcher", "cycle matcher command"],
             "menu": {"label": "Cycle Matcher", "icon": "match_curve_cycle", "items": [
                 {
                     "type": "choice",

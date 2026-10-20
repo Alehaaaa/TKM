@@ -22,6 +22,7 @@ class NudgeToolObject(ToolObject):
             "label": "Nudge Value",
             "text": "NV",
             "tooltip": TOOLTIPS["value"],
+            "keywords": ["shift slightly value", "move incrementally value"],
             "widget_factory": widgets.create_nudge_value_widget,
         },
         "nudge_left": {
@@ -30,6 +31,7 @@ class NudgeToolObject(ToolObject):
             "icon": "nudge_left",
             "callback": api.nudge_left,
             "tooltip": TOOLTIPS["left"],
+            "keywords": ["shift slightly left", "move incrementally left"],
             "operation": _queued_nudge("range", -1),
             "menu": {
                 "label": "Nudge Left",
@@ -50,6 +52,7 @@ class NudgeToolObject(ToolObject):
             "icon": "nudge_left_all_keys",
             "callback": api.nudge_left_all_keys,
             "tooltip": TOOLTIPS["left_all"],
+            "keywords": ["nudge left whole animation", "nudge left entire timeline"],
             "operation": _queued_nudge("all_keys", -1),
         },
         "nudge_left_scene": {
@@ -58,6 +61,7 @@ class NudgeToolObject(ToolObject):
             "icon": "nudge_left_scene",
             "callback": api.nudge_left_scene,
             "tooltip": TOOLTIPS["left_scene"],
+            "keywords": ["shift slightly left scene", "move incrementally left scene"],
             "operation": _queued_nudge("scene", -1),
         },
         "nudge_right": {
@@ -66,6 +70,7 @@ class NudgeToolObject(ToolObject):
             "icon": "nudge_right",
             "callback": api.nudge_right,
             "tooltip": TOOLTIPS["right"],
+            "keywords": ["shift slightly right", "move incrementally right"],
             "operation": _queued_nudge("range", 1),
             "menu": {
                 "label": "Nudge Right",
@@ -86,6 +91,7 @@ class NudgeToolObject(ToolObject):
             "icon": "nudge_right_all_keys",
             "callback": api.nudge_right_all_keys,
             "tooltip": TOOLTIPS["right_all"],
+            "keywords": ["nudge right whole animation", "nudge right entire timeline"],
             "operation": _queued_nudge("all_keys", 1),
         },
         "nudge_right_scene": {
@@ -94,6 +100,7 @@ class NudgeToolObject(ToolObject):
             "icon": "nudge_right_scene",
             "callback": api.nudge_right_scene,
             "tooltip": TOOLTIPS["right_scene"],
+            "keywords": ["shift slightly right scene", "move incrementally right scene"],
             "operation": _queued_nudge("scene", 1),
         },
         "nudge_snap_collision": {
@@ -104,6 +111,7 @@ class NudgeToolObject(ToolObject):
             "get_checked": api.is_snap_collision_enabled,
             "set_checked": api.set_snap_collision_enabled,
             "tooltip": TOOLTIPS["snap_collision"],
+            "keywords": ["quantize collisions", "align collisions"],
             "operation": {"progress": False, "undo": False},
         },
         "nudge_insert_inbetween": {
@@ -112,6 +120,7 @@ class NudgeToolObject(ToolObject):
             "icon": "nudge_insert_inbetween",
             "callback": api.nudge_insert_inbetween,
             "tooltip": TOOLTIPS["insert"],
+            "keywords": ["insert breakdown key", "insert tween frame"],
             "operation": _queued_nudge("inbetween", 1),
         },
         "nudge_insert_inbetween_scene": {
@@ -120,6 +129,7 @@ class NudgeToolObject(ToolObject):
             "icon": "nudge_insert_inbetween_scene",
             "callback": api.nudge_insert_inbetween_scene,
             "tooltip": TOOLTIPS["insert_scene"],
+            "keywords": ["insert breakdown key scene", "insert tween frame scene"],
             "operation": _queued_nudge("inbetween_scene", 1),
         },
         "nudge_remove_inbetween": {
@@ -128,6 +138,7 @@ class NudgeToolObject(ToolObject):
             "icon": "nudge_remove_inbetween",
             "callback": api.nudge_remove_inbetween,
             "tooltip": TOOLTIPS["remove"],
+            "keywords": ["remove breakdown key", "remove tween frame"],
             "operation": _queued_nudge("inbetween", -1),
         },
         "nudge_remove_inbetween_scene": {
@@ -136,6 +147,7 @@ class NudgeToolObject(ToolObject):
             "icon": "nudge_remove_inbetween_scene",
             "callback": api.nudge_remove_inbetween_scene,
             "tooltip": TOOLTIPS["remove_scene"],
+            "keywords": ["remove breakdown key scene", "remove tween frame scene"],
             "operation": _queued_nudge("inbetween_scene", -1),
         },
     }

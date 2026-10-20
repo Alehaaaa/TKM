@@ -14,6 +14,7 @@ class IsolateToolObject(ToolObject):
         "isolate_master": {
             "type": "tool", "label": "Isolate", "icon": "isolate",
             "callback": api.isolate_master, "tooltip": TOOLTIPS["isolate"],
+            "keywords": ["solo", "focus", "hide others"],
             "menu": {
                 "label": "Isolate", "icon": "isolate",
                 "items": ["isolate_bookmarks", "isolate_down_level", "separator", "isolate_help"],
@@ -24,6 +25,7 @@ class IsolateToolObject(ToolObject):
             "icon": "isolate_bookmarks",
             "callback": api.create_isolate_bookmarks_window,
             "tooltip": TOOLTIPS["isolate_bookmarks"],
+            "keywords": ["solo bookmarks", "focus on bookmarks"],
         },
         "isolate_down_level": {
             "type": "check", "label": "Down one level", "text": "D1",
@@ -31,11 +33,13 @@ class IsolateToolObject(ToolObject):
             "get_checked": api.is_down_one_level,
             "set_checked": api.set_down_one_level,
             "tooltip": TOOLTIPS["down_level"],
+            "keywords": ["isolate down down one level", "down one level command"],
         },
         "isolate_help": {
             "type": "tool", "label": "Help", "icon": "help", "pinnable": False,
             "callback": lambda: general.open_url(IsolateToolObject.DOC_URL),
             "tooltip": TOOLTIPS["help"],
+            "keywords": ["isolate documentation", "isolate user guide"],
         },
     }
     SECTION = {

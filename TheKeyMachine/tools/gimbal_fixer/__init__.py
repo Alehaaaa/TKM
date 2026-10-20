@@ -9,6 +9,7 @@ class GimbalFixerToolObject(ToolObject):
     ORDER = 810
     TOOLS = {
         "gimbal_convert_rotation_order": {
+            "keywords": ["convert gimbal order", "convert rotate order"],
             "type": "tool",
             "label": "Convert Rotation Order",
             "callback": api.convert_rotation_order,
@@ -30,5 +31,6 @@ class GimbalFixerToolObject(ToolObject):
             "set_checked": api.toggle,
             "bind_checked_fn": api.bind_gimbal_fixer_toolbar_button,
             "tooltip": TOOLTIPS["gimbal"],
+            "keywords": ["fix gimbal lock", "repair rotation order"],
         },
     }

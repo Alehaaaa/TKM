@@ -505,11 +505,10 @@ def _make_guide(points):
 def _make_guide_curve_api(holder, points):
     """Create and fill the guide curve with one native API addKeys call.
 
-    animBot's Master Spline builds its editable master curve by preparing
-    MTimeArray/MDoubleArray data and calling MFnAnimCurve.addKeys once. That
-    avoids the command-layer notification churn of one cmds.setKeyframe call
-    per guide key, which is especially noticeable when creating a master from
-    dense visible Graph Editor curves.
+    Preparing MTimeArray/MDoubleArray data and calling MFnAnimCurve.addKeys
+    once avoids the command-layer notification churn of one cmds.setKeyframe
+    call per guide key, which is especially noticeable when creating a master
+    from dense visible Graph Editor curves.
     """
     if not points or om is None or oma is None:
         return None

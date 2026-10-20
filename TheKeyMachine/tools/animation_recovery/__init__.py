@@ -10,6 +10,7 @@ class AnimationRecoveryToolObject(ToolObject):
     ORDER = 970
     TOOLS = {
         "animation_recovery_restore": {
+            "keywords": ["recover motion", "recover keyframe animation"],
             "type": "tool",
             "label": "Recover Animation",
             "callback": api.restore,
@@ -26,6 +27,7 @@ class AnimationRecoveryToolObject(ToolObject):
             "icon": "animation_recovery",
             "callback": api.show,
             "tooltip": TOOLTIPS["animation_recovery"],
+            "keywords": ["restore lost animation", "manual animation recovery"],
             "operation": {"progress": False, "undo": False},
         },
     }

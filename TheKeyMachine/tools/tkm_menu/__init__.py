@@ -15,6 +15,7 @@ class TkmMenuToolObject(ToolObject):
             "label": "TheKeyMachine",
             "icon": "tkm_main",
             "tooltip": TOOLTIPS["menu"],
+            "keywords": ["tkm menu thekeymachine", "thekeymachine command"],
             "callback": api.show_menu,
             "menu": {
                 "label": "TheKeyMachine",
@@ -197,6 +198,7 @@ class TkmMenuToolObject(ToolObject):
             "icon": "tkm_main",
             "callback": api.toggle_toolbar,
             "tooltip": TOOLTIPS["toggle"],
+            "keywords": ["switch toolbar", "show or hide toolbar"],
         },
         "toolbar_add_shelf_button": {
             "type": "tool",
@@ -204,6 +206,7 @@ class TkmMenuToolObject(ToolObject):
             "icon": "tkm_main",
             "callback": api.add_shelf_button,
             "tooltip": TOOLTIPS["shelf"],
+            "keywords": ["include toggle button to shelf", "create toggle button to shelf"],
         },
         "toolbar_reload": {
             "type": "tool",
@@ -211,6 +214,7 @@ class TkmMenuToolObject(ToolObject):
             "icon": "reload",
             "callback": api.reload_toolbar,
             "tooltip": TOOLTIPS["reload"],
+            "keywords": ["refresh tools", "restart interface"],
         },
         "toolbar_unload": {
             "type": "tool",
@@ -218,6 +222,7 @@ class TkmMenuToolObject(ToolObject):
             "icon": "close",
             "callback": api.unload_toolbar,
             "tooltip": TOOLTIPS["unload"],
+            "keywords": ["tkm menu unload", "unload command"],
         },
         "toolbar_uninstall": {
             "type": "tool",
@@ -225,6 +230,7 @@ class TkmMenuToolObject(ToolObject):
             "icon": "remove",
             "callback": api.uninstall,
             "tooltip": TOOLTIPS["uninstall"],
+            "keywords": ["tkm menu uninstall", "uninstall command"],
         },
         "check_for_updates": {
             "type": "tool",
@@ -233,6 +239,7 @@ class TkmMenuToolObject(ToolObject):
             "callback": api.check_for_updates,
             "available": api.updates_available,
             "tooltip": TOOLTIPS["updates"],
+            "keywords": ["check for upgrade tkms", "check for install latest versions"],
             "operation": {
                 "progress": False,
                 "undo": False,
@@ -241,6 +248,7 @@ class TkmMenuToolObject(ToolObject):
             },
         },
         "install_update": {
+            "keywords": ["install upgrade tkm", "install install latest version"],
             "type": "tool",
             "label": "Install Update",
             "icon": "check_updates",
@@ -259,6 +267,7 @@ class TkmMenuToolObject(ToolObject):
             "get_checked": api.starts_with_maya,
             "set_checked": api.set_start_with_maya,
             "tooltip": TOOLTIPS["startup"],
+            "keywords": ["start with start with maya", "start with maya command"],
         },
         "show_tooltips": {
             "type": "check",
@@ -267,6 +276,7 @@ class TkmMenuToolObject(ToolObject):
             "get_checked": api.tooltips_enabled,
             "set_checked": api.set_tooltips_enabled,
             "tooltip": TOOLTIPS["tooltips"],
+            "keywords": ["show show tooltips", "show tooltips command"],
         },
         "main_dock_menu": {
             "type": "menu",
@@ -274,6 +284,7 @@ class TkmMenuToolObject(ToolObject):
             "icon": "dock",
             "callback": partial(api.show_menu, "main_dock_menu"),
             "tooltip": TOOLTIPS["dock"],
+            "keywords": ["attach interface", "dock position"],
         },
         "main_system_menu": {
             "type": "menu",
@@ -281,6 +292,7 @@ class TkmMenuToolObject(ToolObject):
             "icon": "settings",
             "callback": partial(api.show_menu, "main_system_menu"),
             "tooltip": TOOLTIPS["system"],
+            "keywords": ["tkm preferences", "application setup"],
         },
         "languages_menu": {
             "type": "menu",
@@ -288,6 +300,7 @@ class TkmMenuToolObject(ToolObject):
             "icon": "globe",
             "callback": partial(api.show_menu, "languages_menu"),
             "tooltip": TOOLTIPS["languages"],
+            "keywords": ["localization options", "interface language"],
         },
         "help_menu": {
             "type": "menu",
@@ -295,6 +308,7 @@ class TkmMenuToolObject(ToolObject):
             "icon": "help",
             "callback": partial(api.show_menu, "help_menu"),
             "tooltip": TOOLTIPS["help"],
+            "keywords": ["tkm documentation menu", "thekeymachine user guide"],
         },
         "hotkeys_window": {
             "type": "tool",
@@ -302,6 +316,7 @@ class TkmMenuToolObject(ToolObject):
             "icon": "hotkeys",
             "callback": api.show_hotkeys,
             "tooltip": TOOLTIPS["hotkeys"],
+            "keywords": ["hotkeyframes hotkeys", "hotanimation keys"],
         },
         "workspaces_window": {
             "type": "tool",
@@ -309,6 +324,7 @@ class TkmMenuToolObject(ToolObject):
             "icon": "align",
             "callback": api.show_workspaces,
             "tooltip": TOOLTIPS["workspaces"],
+            "keywords": ["toolbar layouts", "interface presets"],
         },
         "version_history_window": {
             "type": "tool",
@@ -316,6 +332,7 @@ class TkmMenuToolObject(ToolObject):
             "icon": "about",
             "callback": api.show_version_history,
             "tooltip": TOOLTIPS["history"],
+            "keywords": ["release notes", "change log"],
         },
         "about_window": {
             "type": "tool",
@@ -323,6 +340,7 @@ class TkmMenuToolObject(ToolObject):
             "icon": "about",
             "callback": api.show_about,
             "tooltip": TOOLTIPS["about"],
+            "keywords": ["about about", "about command"],
         },
         "donate_window": {
             "type": "tool",
@@ -330,6 +348,7 @@ class TkmMenuToolObject(ToolObject):
             "icon": "donate",
             "callback": api.show_donate,
             "tooltip": TOOLTIPS["donate"],
+            "keywords": ["donate donate", "donate command"],
         },
         "bug_report_window": {
             "type": "menu",
@@ -338,6 +357,7 @@ class TkmMenuToolObject(ToolObject):
             "callback": partial(api.show_menu, "bug_report_window"),
             "available": api.bug_reports_available,
             "tooltip": TOOLTIPS["bug_report_menu"],
+            "keywords": ["bug report get in touch", "get in touch command"],
             "menu": api.populate_bug_report_menu,
         },
         "bug_report_open_dialog": {
@@ -346,6 +366,7 @@ class TkmMenuToolObject(ToolObject):
             "icon": "get_in_touch",
             "callback": api.show_bug_report,
             "tooltip": TOOLTIPS["bug_report"],
+            "keywords": ["send contact support", "send report issue"],
         },
     }
     SECTION = {

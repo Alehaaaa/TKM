@@ -17,6 +17,7 @@ class DepthMoverToolObject(ToolObject):
             "get_checked": api.is_enabled,
             "set_checked": api.toggle,
             "tooltip": TOOLTIPS["depth_mover"],
+            "keywords": ["move in camera depth", "screen depth adjustment"],
         },
     }
     SECTION = None

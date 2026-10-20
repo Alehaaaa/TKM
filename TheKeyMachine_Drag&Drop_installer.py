@@ -31,7 +31,7 @@ elif _qt_major == "6":
 else:
     raise ImportError("Unsupported Maya Qt version: {}".format(_qt_major))
 
-__version__ = "1.0.3"
+__version__ = "1.0.4"
 __stage__ = "beta"
 __build__ = "357"
 __codename__ = "Cortado"

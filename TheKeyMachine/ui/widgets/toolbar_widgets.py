@@ -317,16 +317,58 @@ def bind_background_runners_activity_button(btn):
     return btn
 
 
+def _dimmed_icon(icon_path, opacity=0.3):
+    """A faded copy of an icon, for the "off" half of a blink cycle."""
+    base = QtGui.QPixmap(icon_path or "")
+    if base.isNull():
+        return QtGui.QIcon(icon_path or "")
+    faded = QtGui.QPixmap(base.size())
+    faded.fill(QtCore.Qt.transparent)
+    painter = QtGui.QPainter(faded)
+    painter.setOpacity(max(0.0, min(1.0, opacity)))
+    painter.drawPixmap(0, 0, base)
+    painter.end()
+    return QtGui.QIcon(faded)
+
+
 def bind_pause_viewport_auto_icon(btn):
+    """Pause Viewport toolbar button.
+
+    * While Auto Pause is enabled the button blinks its auto glyph (a steady
+      pulse between full and faded), so the running auto mode is visible at a
+      glance.
+    * Alt-click toggles Auto Pause (Alt-hover previews the auto glyph + label,
+      via the button's native shortcut-variant system); a plain click still
+      toggles the manual pause.
+    """
     if not wutil.is_valid_widget(btn):
         return btn
 
     from TheKeyMachine.tools import registry
     from TheKeyMachine.tools.pause_viewport import api as pauseViewportApi
 
-    shortcut_variants = list(getattr(btn, "_shortcut_variants", []) or [])
     base_shortcuts = list(
         (getattr(btn, "_base_state", {}) or {}).get("shortcuts", []) or []
+    )
+
+    auto_icon_path = icons.pause_viewport_auto
+    icon_on = QtGui.QIcon(auto_icon_path)
+    icon_faded = _dimmed_icon(auto_icon_path, 0.3)
+
+    # Alt is mask bit 8 (see runtime._qt_modifiers_to_mask). Giving the button
+    # this one variant means Alt-hover shows the auto glyph/label and Alt-click
+    # routes to toggle_auto_pause through the existing triggerToolCallback path.
+    btn.setShortcutVariants(
+        [
+            {
+                "mask": 8,
+                "callback": pauseViewportApi.toggle_auto_pause,
+                "icon": auto_icon_path,
+                "label": "Auto Pause Viewport",
+                "menu_label": "Auto Pause Viewport",
+                "description": "Alt-click to toggle automatic viewport pausing.",
+            }
+        ]
     )
 
     def _display_state(tool_id):
@@ -335,23 +377,47 @@ def bind_pause_viewport_auto_icon(btn):
         state["shortcuts"] = base_shortcuts
         return state
 
+    blink = getattr(btn, "_tkm_pause_auto_blink_timer", None)
+    if blink is None:
+        blink = QtCore.QTimer(btn)
+        blink.setInterval(450)
+        btn._tkm_pause_auto_blink_timer = blink
+    phase = {"on": True}
+
+    def _tick():
+        if not wutil.is_valid_widget(btn):
+            blink.stop()
+            return
+        phase["on"] = not phase["on"]
+        btn.setIcon(icon_on if phase["on"] else icon_faded)
+
+    with warnings.catch_warnings():
+        warnings.simplefilter("ignore", RuntimeWarning)
+        try:
+            blink.timeout.disconnect()
+        except Exception:
+            pass
+    blink.timeout.connect(_tick)
+
     def _sync_icon(*_args, target=btn):
         if not wutil.is_valid_widget(target):
             return
-        tool_id = (
-            "pause_viewport_auto"
-            if pauseViewportApi.is_auto_pause_enabled()
-            else "pause_viewport"
-        )
-        state = _display_state(tool_id)
+        auto_on = pauseViewportApi.is_auto_pause_enabled()
+        state = _display_state("pause_viewport_auto" if auto_on else "pause_viewport")
         try:
             target._base_state.update(state)
             target._icon = state.get("icon")
             if getattr(target, "_active_variant_mask", None) is None:
                 target._apply_display_state(state)
-            target.setShortcutVariants(shortcut_variants)
         except Exception:
             target.setIcon(QtGui.QIcon(state.get("icon") or ""))
+        if auto_on:
+            phase["on"] = True
+            target.setIcon(icon_on)
+            if not blink.isActive():
+                blink.start()
+        else:
+            blink.stop()
 
     signal = pauseViewportApi.auto_pause_changed_signal()
     if signal is not None:

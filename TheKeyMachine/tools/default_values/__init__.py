@@ -16,6 +16,7 @@ class DefaultValuesToolObject(ToolObject):
         "default_object_values": {
             "type": "tool", "label": "Default Pose", "icon": "default",
             "callback": api.apply_all, "tooltip": TOOLTIPS["all"],
+            "keywords": ["reset control pose", "restore default values"],
             "menu": {
                 "label": "Default Pose",
                 "icon": "default",
@@ -25,13 +26,13 @@ class DefaultValuesToolObject(ToolObject):
                 ],
             },
         },
-        "default_translations": {"type": "tool", "label": "Default Translations", "text": "RT", "icon": "default", "callback": api.apply_translations, "tooltip": TOOLTIPS["translations"]},
-        "default_rotations": {"type": "tool", "label": "Default Rotations", "text": "RR", "icon": "default", "callback": api.apply_rotations, "tooltip": TOOLTIPS["rotations"]},
-        "default_scales": {"type": "tool", "label": "Default Scales", "text": "RS", "icon": "default", "callback": api.apply_scales, "tooltip": TOOLTIPS["scales"]},
-        "default_trs": {"type": "tool", "label": "Default Translation Rotation Scale", "text": "RTRS", "icon": "default", "callback": api.apply_trs, "tooltip": TOOLTIPS["trs"]},
-        "default_restore_defaults": {"type": "tool", "label": "Remove Saved Defaults for Selected", "icon": "default", "callback": api.remove_selected, "tooltip": TOOLTIPS["remove"], "pinnable": False},
-        "default_clear_all": {"type": "tool", "label": "Clear All Saved Defaults", "icon": "default", "callback": api.clear_all, "tooltip": TOOLTIPS["clear"], "pinnable": False},
-        "default_help": {"type": "tool", "label": "Help", "icon": "help", "callback": lambda: general.open_url(DefaultValuesToolObject.DOC_URL), "tooltip": TOOLTIPS["help"], "pinnable": False},
+        "default_translations": {"keywords": ["reset translations", "restore translations"], "type": "tool", "label": "Default Translations", "text": "RT", "icon": "default", "callback": api.apply_translations, "tooltip": TOOLTIPS["translations"]},
+        "default_rotations": {"keywords": ["reset rotations", "restore rotations"], "type": "tool", "label": "Default Rotations", "text": "RR", "icon": "default", "callback": api.apply_rotations, "tooltip": TOOLTIPS["rotations"]},
+        "default_scales": {"keywords": ["reset scales", "restore scales"], "type": "tool", "label": "Default Scales", "text": "RS", "icon": "default", "callback": api.apply_scales, "tooltip": TOOLTIPS["scales"]},
+        "default_trs": {"keywords": ["reset translation rotation scale", "restore translation rotation scale"], "type": "tool", "label": "Default Translation Rotation Scale", "text": "RTRS", "icon": "default", "callback": api.apply_trs, "tooltip": TOOLTIPS["trs"]},
+        "default_restore_defaults": {"keywords": ["remove saved defaults for picked controls", "clear defaults for chosen controls"], "type": "tool", "label": "Remove Saved Defaults for Selected", "icon": "default", "callback": api.remove_selected, "tooltip": TOOLTIPS["remove"], "pinnable": False},
+        "default_clear_all": {"keywords": ["remove all saved defaults", "erase all saved defaults"], "type": "tool", "label": "Clear All Saved Defaults", "icon": "default", "callback": api.clear_all, "tooltip": TOOLTIPS["clear"], "pinnable": False},
+        "default_help": {"keywords": ["default values documentation", "default pose guide"], "type": "tool", "label": "Help", "icon": "help", "callback": lambda: general.open_url(DefaultValuesToolObject.DOC_URL), "tooltip": TOOLTIPS["help"], "pinnable": False},
     }
     SECTION = {
         "id": "default_tools", "label": "Default", "color": COLORS.toolbar.green.hex,

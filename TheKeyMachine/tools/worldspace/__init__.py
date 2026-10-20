@@ -21,6 +21,7 @@ class WorldspaceToolObject(ToolObject):
             "icon": "worldspace_copy_frame",
             "callback": api.worldspace_copy_frame,
             "tooltip": TOOLTIPS["copy_frame"],
+            "keywords": ["ws"],
             "operation": {"undo": False, "suspend_refresh": True},
         },
         "ws_copy_range": {
@@ -29,6 +30,7 @@ class WorldspaceToolObject(ToolObject):
             "icon": "worldspace_copy_animation",
             "callback": api.worldspace_copy_animation,
             "tooltip": TOOLTIPS["copy_range"],
+            "keywords": ["copy world space highlighted time span", "copy world space chosen frame range"],
             "operation": {"undo": False, "suspend_refresh": True},
         },
         "ws_paste_frame": {
@@ -37,6 +39,7 @@ class WorldspaceToolObject(ToolObject):
             "icon": "worldspace_paste_frame",
             "callback": api.paste_worldspace_single_frame,
             "tooltip": TOOLTIPS["paste_frame"],
+            "keywords": ["paste global coordinates", "paste world coordinates"],
             "operation": {"rollback_on_cancel": True},
         },
         "ws_paste": {
@@ -45,6 +48,7 @@ class WorldspaceToolObject(ToolObject):
             "icon": "worldspace_paste_animation",
             "callback": api.worldspace_paste_animation,
             "tooltip": TOOLTIPS["paste_animation"],
+            "keywords": ["paste global coordinates all animation", "paste world coordinates all animation"],
             "operation": {
                 "suspend_refresh": True,
                 "rollback_on_cancel": True,
@@ -54,6 +58,7 @@ class WorldspaceToolObject(ToolObject):
             "type": "tool",
             "label": "Help - World Space",
             "tooltip": TOOLTIPS["help"],
+            "keywords": ["help global coordinates", "help world coordinates"],
             "icon": "help",
             "callback": lambda: general.open_url(WorldspaceToolObject.DOC_URL),
             "pinnable": False,

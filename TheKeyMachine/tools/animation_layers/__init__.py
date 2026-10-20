@@ -40,22 +40,26 @@ class AnimationLayersToolObject(ToolObject):
             "set_checked": api.toggle_window,
             "bind_checked_fn": api.bind_animation_layers_toolbar_button,
             "tooltip": TOOLTIPS["animation_layers"],
+            "keywords": ["anim layer editor", "layered animation"],
         },
         "animation_layers_smart_merge": {
             "type": "tool", "label": "Smart Merge Selected", "text": "Mrg",
             "icon": "layer_merge", "callback": api.smart_merge_selected_layers,
             "tooltip": TOOLTIPS["smart_merge"],
+            "keywords": ["smart merge picked layers", "smart merge chosen layers"],
         },
         "animation_layers_export": {
             "type": "tool", "label": "Export", "text": "Ex",
             "icon": "export", "callback": api.export_selected_layers,
             "tooltip": TOOLTIPS["export"],
+            "keywords": ["save animation layers", "write animation layers"],
             "operation": {"undo": False},
         },
         "animation_layers_import": {
             "type": "tool", "label": "Import", "text": "Im",
             "icon": "import", "callback": api.import_layers_file,
             "tooltip": TOOLTIPS["import"],
+            "keywords": ["load animation layers", "read animation layers"],
         },
     }
     SECTION = {

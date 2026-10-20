@@ -18,6 +18,7 @@ class OnionSkinToolObject(ToolObject):
             "set_checked": api.toggle_window,
             "bind_checked_fn": api.bind_toolbar_button,
             "tooltip": TOOLTIPS["onion_skin"],
+            "keywords": ["animation ghosting", "ghost adjacent frames"],
             "menu": {
                 "label": "Onion Skin",
                 "icon": "onion_skin",
@@ -148,6 +149,7 @@ class OnionSkinToolObject(ToolObject):
             "get_checked": controller.is_enabled,
             "set_checked": controller.set_enabled,
             "tooltip": TOOLTIPS["toggle"],
+            "keywords": ["enable animation ghosting", "enable ghost adjacent frames"],
         },
         "onion_skin_add_selection": {
             "type": "tool",
@@ -155,6 +157,7 @@ class OnionSkinToolObject(ToolObject):
             "icon": "add",
             "callback": controller.add_selected_objects,
             "tooltip": TOOLTIPS["add_selection"],
+            "keywords": ["add picked objects to ghosting", "include chosen controls in onion skin"],
         },
         "onion_skin_clear_buffer": {
             "type": "tool",
@@ -162,6 +165,7 @@ class OnionSkinToolObject(ToolObject):
             "icon": "refresh",
             "callback": controller.clear_buffer,
             "tooltip": TOOLTIPS["clear_buffer"],
+            "keywords": ["remove onion buffer", "erase onion buffer"],
         },
         "onion_skin_draw_behind": {
             "type": "check",
@@ -171,6 +175,7 @@ class OnionSkinToolObject(ToolObject):
             "get_checked": controller.is_draw_behind,
             "set_checked": controller.set_draw_behind,
             "tooltip": TOOLTIPS["draw_behind"],
+            "keywords": ["onion skin draw draw behind current pose", "draw behind current pose command"],
         },
         "onion_skin_auto_clear": {
             "type": "check",
@@ -180,6 +185,7 @@ class OnionSkinToolObject(ToolObject):
             "get_checked": controller.is_auto_clear_buffer,
             "set_checked": controller.set_auto_clear_buffer,
             "tooltip": TOOLTIPS["auto_clear"],
+            "keywords": ["remove buffer when camera moves", "erase buffer when camera moves"],
         },
         "onion_skin_stay_on_top": {
             "type": "check",
@@ -189,6 +195,7 @@ class OnionSkinToolObject(ToolObject):
             "get_checked": api.is_stay_on_top,
             "set_checked": api.set_stay_on_top,
             "tooltip": TOOLTIPS["stay_on_top"],
+            "keywords": ["onion skin stay on stay on top", "stay on top command"],
         },
         "onion_skin_neighbor_keys": {
             "type": "check",
@@ -198,6 +205,7 @@ class OnionSkinToolObject(ToolObject):
             "get_checked": controller.is_relative_to_keys,
             "set_checked": controller.set_relative_to_keys,
             "tooltip": TOOLTIPS["neighbor_keys"],
+            "keywords": ["onion skin neighbor use neighboring key poses", "use neighboring key poses command"],
         },
         "onion_skin_ghost_inbetweens": {
             "type": "check",
@@ -207,6 +215,7 @@ class OnionSkinToolObject(ToolObject):
             "get_checked": controller.is_ghost_inbetweens,
             "set_checked": controller.set_ghost_inbetweens,
             "tooltip": TOOLTIPS["ghost_inbetweens"],
+            "keywords": ["onion skin ghost ghost in betweens", "ghost in betweens command"],
         },
         "onion_skin_auto_update": {
             "type": "check",
@@ -216,6 +225,7 @@ class OnionSkinToolObject(ToolObject):
             "get_checked": api.is_auto_update,
             "set_checked": api.set_auto_update,
             "tooltip": TOOLTIPS["auto_update"],
+            "keywords": ["live onion skin updates", "refresh ghosting automatically"],
         },
         "onion_skin_past_color": {
             "type": "tool",
@@ -223,6 +233,7 @@ class OnionSkinToolObject(ToolObject):
             "icon": "onion_skin",
             "callback": api.pick_past_color,
             "tooltip": TOOLTIPS["past_color"],
+            "keywords": ["past pose display colour", "past pose tint"],
         },
         "onion_skin_future_color": {
             "type": "tool",
@@ -230,6 +241,7 @@ class OnionSkinToolObject(ToolObject):
             "icon": "onion_skin",
             "callback": api.pick_future_color,
             "tooltip": TOOLTIPS["future_color"],
+            "keywords": ["future pose display colour", "future pose tint"],
         },
         "onion_skin_held_color": {
             "type": "tool",
@@ -237,5 +249,6 @@ class OnionSkinToolObject(ToolObject):
             "icon": "onion_skin",
             "callback": api.pick_held_color,
             "tooltip": TOOLTIPS["held_color"],
+            "keywords": ["held pose display colour", "held pose tint"],
         },
     }

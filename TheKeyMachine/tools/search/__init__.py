@@ -19,6 +19,7 @@ class SearchToolObject(ToolObject):
             "set_checked": api.set_search_window_open,
             "bind_checked_fn": api.bind_search_toolbar_button,
             "tooltip": TOOLTIPS["search"],
+            "keywords": ["find commands", "command palette"],
         },
     }
     SECTION = {

@@ -25,12 +25,14 @@ column shows. Everything applies immediately to the live toolbar(s) -- there
 is no separate "Apply" step, matching the toolbar's own right-click pinning
 menu.
 
-The Color Group column reorders whole color runs (see
-``registry.group_sections_by_color`` / ``controller.get_color_groups``) as one
-atomic unit rather than individual sections, matching how the toolbar itself
-now visually clusters sections by color. A group spanning more than one
-section shows every member's tools in the Tools column, one small header per
-section.
+The Color Group column has one row per distinct color (see
+``controller.get_color_groups``), labelled by the color's name; every regular
+tool section of that color is collected into it, with no duplicate rows.
+Slider sections stay separate -- each is its own row, labelled by its own name,
+never merged into a color group -- so a slider keeps its modes together as one
+unit. Reordering a row moves all of its sections together, keeping them
+contiguous on the toolbar. A row spanning more than one section shows every
+member's tools in the Tools column, one small header per section.
 
 Workspace/Toolbar/Position/Alignment/Color Group rows are styled like the
 Hotkeys window's section list (tools/hotkeys/controller.py): alternating row shading
@@ -55,7 +57,7 @@ from TheKeyMachine.tools.workspaces import controller
 # picker columns -- taller rows read more like Maya's own list pickers.
 # Tools is a dense list of many small toggles, so it stays compact.
 ROW_HEIGHT_TALL = DPI(32)
-ROW_HEIGHT_TOOLS = DPI(20)
+ROW_HEIGHT_TOOLS = DPI(24)
 ROW_HEIGHT_TOOLS_HEADER = DPI(26)
 
 LIST_CONTAINER_STYLE = (
@@ -99,14 +101,11 @@ def _text_badge_qicon(text, size=16):
 
 
 def _group_row_label(group):
-    """Display title for one Color Group row: the first section's label, plus
-    a "(+N)" count when the group clusters more than one section."""
-    sections = group.get("sections") or []
-    if not sections:
-        return group.get("id") or ""
-    if len(sections) == 1:
-        return sections[0]["label"]
-    return "{} (+{})".format(sections[0]["label"], len(sections) - 1)
+    """Display title for one Color Group row: the color's name (e.g. 'Green').
+
+    The group clusters every section sharing that color; the full member list
+    is in the row's tooltip (see _group_row_tooltip)."""
+    return group.get("name") or group.get("id") or ""
 
 
 def _group_row_tooltip(group):
@@ -421,7 +420,9 @@ class ToolPinButton(QtWidgets.QToolButton):
             self.setIcon(QtGui.QIcon(icon_path))
         elif badge_text:
             self.setIcon(_text_badge_qicon(badge_text))
-        self.setIconSize(QtCore.QSize(int(DPI(16)), int(DPI(16))))
+        # Icon sized to nearly fill the row, like the toolbar's own 28px button
+        # with a 26px icon, so a pinned tool's glyph reads at the same weight.
+        self.setIconSize(QtCore.QSize(int(DPI(22)), int(DPI(22))))
         self.setToolButtonStyle(QtCore.Qt.ToolButtonTextBesideIcon)
         self.setSizePolicy(QtWidgets.QSizePolicy.Expanding, QtWidgets.QSizePolicy.Fixed)
         self.setFixedHeight(ROW_HEIGHT_TOOLS)
@@ -431,17 +432,19 @@ class ToolPinButton(QtWidgets.QToolButton):
         self.toggled.connect(self._handle_toggle)
 
     def _refresh_style(self):
-        if self.isChecked():
-            self.setStyleSheet(
-                "QToolButton { text-align: left; padding-left: 8px; background-color: %s;"
-                " color: #1a1a1a; border: none; font-weight: bold; }" % self._color_hex
-            )
-        else:
-            self.setStyleSheet(
-                "QToolButton { text-align: left; padding-left: 8px; background-color: transparent;"
-                " color: #d0d0d0; border: none; }"
-                " QToolButton:hover { background-color: #3a3a3a; }"
-            )
+        # Match the toolbar's own tool buttons (customWidgets.QFlatToolButton):
+        # transparent with grey bold text, white text on hover, and a fill of
+        # the section color with white text when checked/pressed. Qt drives the
+        # :hover/:checked states, so the whole style is one stylesheet. The
+        # row-only bits (left-aligned text, left padding) stay.
+        self.setStyleSheet(
+            "QToolButton { text-align: left; padding-left: 8px; border: none;"
+            " border-radius: 0px; background-color: transparent; color: #bfbfbf;"
+            " font-size: 11px; font-weight: bold; }"
+            " QToolButton:hover { background-color: transparent; color: #ffffff; }"
+            " QToolButton:checked, QToolButton:pressed { background-color: %s;"
+            " color: #ffffff; }" % self._color_hex
+        )
 
     def _handle_toggle(self, checked):
         self._refresh_style()
@@ -863,11 +866,10 @@ class WorkspacesWindow(customDialogs.QFlatDialog):
 
     def _on_groups_reordered(self, *_args):
         list_widget = self.group_column.list_widget
-        # Identify the dragged group by one of its member section ids, not
-        # its own id string: that string is a concatenation of member
-        # section ids (see controller.get_color_groups), which this very
-        # reorder can change if it merges or splits color runs. The section
-        # identity survives that even when the group id doesn't.
+        # Identify the dragged group by one of its member section ids. The
+        # group id is its color, and after the reorder each color's sections
+        # are contiguous, so re-selecting by a stable section identity lands on
+        # the right group regardless of how the column is rebuilt.
         dragged_item = list_widget.currentItem()
         dragged_group_id = dragged_item.data(QtCore.Qt.UserRole) if dragged_item is not None else None
         dragged_group = self._current_groups_by_id.get(dragged_group_id) or {}
@@ -907,10 +909,13 @@ class WorkspacesWindow(customDialogs.QFlatDialog):
         self._watched_group_sections = []
 
     def _on_live_pins_changed(self, *_args):
-        # Deferred: this can fire synchronously from inside a ToolPinButton's
-        # own toggled signal (clicking a row in this same list), and
-        # rebuilding the list synchronously would delete that button mid-click.
-        QtCore.QTimer.singleShot(0, lambda: self._refresh_tools_list(preserve_scroll=True))
+        # Refresh the pin toggles in place instead of rebuilding the column: a
+        # pin change (from any surface, including a slider-mode swap) only
+        # flips checkmarks, never which tools are listed, so there is nothing
+        # to rebuild. This also retires the old deferral -- we no longer delete
+        # the very row whose toggle signal is mid-emit; we just re-set it to
+        # the value it already holds.
+        self._sync_tool_checks()
 
     # ---------------------------------------------------------------- tools column
 
@@ -948,6 +953,29 @@ class WorkspacesWindow(customDialogs.QFlatDialog):
 
         if preserve_scroll:
             list_widget.verticalScrollBar().setValue(scroll_value)
+
+    def _sync_tool_checks(self):
+        """Update the Tools column's pin rows in place from the live toolbar.
+
+        Iterate the rows already on screen and flip each one's checked state to
+        match the live section, recreating nothing. Reserved for pin-state
+        changes, where membership is identical; selection changes still rebuild
+        via ``_refresh_tools_list``.
+        """
+        list_widget = self.tools_column.list_widget
+        if not is_valid_widget(list_widget):
+            return
+        group = self._current_groups_by_id.get(self._current_group_id) or {}
+        checked_by_key = {}
+        for section in group.get("sections") or []:
+            for tool in controller.get_section_tools(self._current_toolbar_id, section["id"]):
+                checked_by_key[(section["id"], tool["id"])] = tool["checked"]
+        for index in range(list_widget.count()):
+            row = list_widget.itemWidget(list_widget.item(index))
+            if isinstance(row, ToolPinButton):
+                checked = checked_by_key.get((row.section_id, row.tool_id))
+                if checked is not None:
+                    row.set_checked_silently(checked)
 
     def _on_tool_toggled(self, section_id, tool_id, checked):
         controller.set_tool_pinned(self._current_toolbar_id, section_id, tool_id, checked)

@@ -19,6 +19,7 @@ class OrbitToolObject(ToolObject):
             "set_checked": api.toggle,
             "bind_checked_fn": api.bind_orbit_toolbar_button,
             "tooltip": TOOLTIPS["orbit"],
+            "keywords": ["tumble camera", "rotate view"],
         },
         "orbit_window": {
             "type": "tool",
@@ -26,6 +27,7 @@ class OrbitToolObject(ToolObject):
             "icon": "orbit_ui",
             "callback": api.orbit_window,
             "tooltip": TOOLTIPS["orbit"],
+            "keywords": ["orbit panel", "orbit dialog"],
         },
     }
     SECTION = {

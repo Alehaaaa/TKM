@@ -524,7 +524,12 @@ def build_toolbar_pinning_menu(parent_widget, toolbar_widget):
     """
     from TheKeyMachine.core import i18n
 
-    menu = cw.MenuWidget(parent_widget, tearoff=False)
+    # Tear-off: the user can detach it and keep it on screen. Its section
+    # submenus already live-sync each checkmark through
+    # QFlatSectionWidget._bind_pin_menu_action (pinsChanged -> setChecked), so
+    # a detached menu tracks pins toggled from buttons or slider-mode swaps;
+    # on_pins_changed below keeps its footer current too.
+    menu = cw.MenuWidget(parent_widget, tearoff=True)
     from TheKeyMachine.tools.tkm_menu import api as tkmMenuApi
 
     menu.addAction(tkmMenuApi.create_logo_action(menu, clickable=False))
@@ -554,6 +559,10 @@ def build_toolbar_pinning_menu(parent_widget, toolbar_widget):
         def on_pins_changed(*args, **kwargs):
             is_deviating = workspaces.is_current_workspace_deviating(sections)
             workspaces.mark_workspace_modified(is_deviating)
+            # While torn off the menu stays on screen, so a pin change from any
+            # surface must refresh its footer here, not only on the next open.
+            if wutil.is_valid_widget(menu) and menu.isVisible():
+                refresh_toolbar_pinning_menu(menu, toolbar_widget)
 
         for section in sections:
             if hasattr(section, "pinsChanged"):

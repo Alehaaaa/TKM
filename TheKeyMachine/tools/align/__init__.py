@@ -29,6 +29,7 @@ class AlignToolObject(ToolObject):
             "icon": "align",
             "callback": api.align_selected_objects,
             "tooltip": TOOLTIPS["align"],
+            "keywords": ["match", "snap"],
         },
         "align_objects_all_keys": {
             "type": "tool",
@@ -36,6 +37,7 @@ class AlignToolObject(ToolObject):
             "icon": "align",
             "callback": partial(api.align_selected_objects, key_scope="all"),
             "tooltip": TOOLTIPS["align"],
+            "keywords": ["align objects whole animation", "align objects entire timeline"],
         },
         "align_object_translation": {
             "type": "tool",
@@ -45,6 +47,7 @@ class AlignToolObject(ToolObject):
                 api.align_selected_objects, pos=True, rot=False, scl=False
             ),
             "tooltip": TOOLTIPS["translation"],
+            "keywords": ["match object translation", "snap object translation"],
         },
         "align_object_translation_all_keys": {
             "type": "tool",
@@ -58,6 +61,7 @@ class AlignToolObject(ToolObject):
                 key_scope="all",
             ),
             "tooltip": TOOLTIPS["translation_all"],
+            "keywords": ["align object translation whole animation", "align object translation entire timeline"],
         },
         "align_object_rotation": {
             "type": "tool",
@@ -67,6 +71,7 @@ class AlignToolObject(ToolObject):
                 api.align_selected_objects, pos=False, rot=True, scl=False
             ),
             "tooltip": TOOLTIPS["rotation"],
+            "keywords": ["match object rotation", "snap object rotation"],
         },
         "align_object_rotation_all_keys": {
             "type": "tool",
@@ -80,6 +85,7 @@ class AlignToolObject(ToolObject):
                 key_scope="all",
             ),
             "tooltip": TOOLTIPS["rotation_all"],
+            "keywords": ["align object rotation whole animation", "align object rotation entire timeline"],
         },
         "align_object_scale": {
             "type": "tool",
@@ -89,6 +95,7 @@ class AlignToolObject(ToolObject):
                 api.align_selected_objects, pos=False, rot=False, scl=True
             ),
             "tooltip": TOOLTIPS["scale"],
+            "keywords": ["match object scale", "snap object scale"],
         },
         "align_object_scale_all_keys": {
             "type": "tool",
@@ -102,6 +109,7 @@ class AlignToolObject(ToolObject):
                 key_scope="all",
             ),
             "tooltip": TOOLTIPS["scale_all"],
+            "keywords": ["align object scale whole animation", "align object scale entire timeline"],
         },
         "align_objects_help": {
             "type": "tool",
@@ -109,6 +117,7 @@ class AlignToolObject(ToolObject):
             "icon": "help",
             "callback": lambda: general.open_url(AlignToolObject.DOC_URL),
             "tooltip": TOOLTIPS["help"],
+            "keywords": ["match objects help", "snap objects help"],
             "pinnable": False,
             "operation": {
                 "progress": False,

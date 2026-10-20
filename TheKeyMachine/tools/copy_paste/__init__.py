@@ -16,6 +16,7 @@ class CopyPasteToolObject(ToolObject):
         "copy_pose": {
             "type": "tool", "label": "Copy Pose", "icon": "copy_pose",
             "callback": api.copy_pose, "tooltip": TOOLTIPS["copy_pose"],
+            "keywords": ["duplicate pose", "capture pose"],
             "operation": {"undo": False},
             "menu": {
                 "label": "Copy Pose", "icon": "copy_pose",
@@ -31,19 +32,23 @@ class CopyPasteToolObject(ToolObject):
         "paste_pose": {
             "type": "tool", "label": "Paste Pose", "icon": "paste_pose",
             "callback": api.paste_pose, "tooltip": TOOLTIPS["paste_pose"],
+            "keywords": ["apply pose", "insert pose"],
             "operation": {"rollback_on_cancel": True, "suspend_refresh": True},
         },
         "paste_mirror_pose": {
             "type": "tool", "label": "Paste Mirror Pose", "icon": "paste_opposite_animation",
             "callback": api.paste_mirror_pose, "tooltip": TOOLTIPS["paste_mirror_pose"],
+            "keywords": ["paste flip pose", "paste reflect pose"],
             "operation": {"rollback_on_cancel": True, "suspend_refresh": True},
         },
         "paste_pose_to": {
             "type": "tool", "label": "Paste Pose To", "icon": "paste_pose",
             "callback": api.paste_pose_to, "tooltip": TOOLTIPS["paste_pose_to"],
+            "keywords": ["open paste pose target", "paste pose through dialog"],
             "operation": {"progress": False, "undo": False},
         },
         "paste_pose_to_apply": {
+            "keywords": ["apply pose to target", "confirm pose paste"],
             "type": "tool", "label": "Paste Pose To", "icon": "paste_pose",
             "callback": api.paste_pose_to_apply, "pinnable": False,
             "operation": {"rollback_on_cancel": True, "suspend_refresh": True},
@@ -51,14 +56,17 @@ class CopyPasteToolObject(ToolObject):
         "export_pose_file": {
             "type": "tool", "label": "Export Pose", "icon": "export",
             "callback": api.export_pose_file, "tooltip": TOOLTIPS["export_pose"],
+            "keywords": ["save pose", "write pose"],
         },
         "import_pose_file": {
             "type": "tool", "label": "Import Pose", "icon": "import",
             "callback": api.import_pose_file, "tooltip": TOOLTIPS["import_pose"],
+            "keywords": ["load pose", "read pose"],
         },
         "copy_animation": {
             "type": "tool", "label": "Copy Animation", "icon": "copy_animation",
             "callback": api.copy_animation, "tooltip": TOOLTIPS["copy_animation"],
+            "keywords": ["duplicate animation", "capture animation"],
             "operation": {"undo": False},
             "menu": {
                 "label": "Copy Animation", "icon": "copy_animation",
@@ -77,24 +85,29 @@ class CopyPasteToolObject(ToolObject):
         "paste_animation": {
             "type": "tool", "label": "Paste Replace Animation", "icon": "paste_animation",
             "callback": api.paste_animation, "tooltip": TOOLTIPS["paste_animation"],
+            "keywords": ["apply replace animation", "insert replace animation"],
             "operation": {"rollback_on_cancel": True, "suspend_refresh": True},
         },
         "paste_insert_animation": {
             "type": "tool", "label": "Paste Insert Animation", "icon": "paste_insert_animation",
             "callback": api.paste_insert_animation, "tooltip": TOOLTIPS["paste_insert_animation"],
+            "keywords": ["apply insert animation", "insert insert animation"],
             "operation": {"rollback_on_cancel": True, "suspend_refresh": True},
         },
         "paste_opposite_animation": {
             "type": "tool", "label": "Paste Mirror Animation", "icon": "paste_opposite_animation",
             "callback": api.paste_opposite_animation, "tooltip": TOOLTIPS["paste_opposite_animation"],
+            "keywords": ["paste flip animation", "paste reflect animation"],
             "operation": {"rollback_on_cancel": True, "suspend_refresh": True},
         },
         "paste_animation_to": {
             "type": "tool", "label": "Paste Animation To", "icon": "paste_animation",
             "callback": api.paste_animation_to, "tooltip": TOOLTIPS["paste_animation_to"],
+            "keywords": ["open paste animation target", "paste animation through dialog"],
             "operation": {"progress": False, "undo": False},
         },
         "paste_animation_to_apply": {
+            "keywords": ["apply animation to target", "confirm animation paste"],
             "type": "tool", "label": "Paste Animation To", "icon": "paste_animation",
             "callback": api.paste_animation_to_apply, "pinnable": False,
             "operation": {"rollback_on_cancel": True, "suspend_refresh": True},
@@ -102,10 +115,12 @@ class CopyPasteToolObject(ToolObject):
         "export_animation_file": {
             "type": "tool", "label": "Export Animation", "icon": "export",
             "callback": api.export_animation_file, "tooltip": TOOLTIPS["export_animation"],
+            "keywords": ["save animation", "write animation"],
         },
         "import_animation_file": {
             "type": "tool", "label": "Import Animation", "icon": "import",
             "callback": api.import_animation_file, "tooltip": TOOLTIPS["import_animation"],
+            "keywords": ["load animation", "read animation"],
         },
     }
 

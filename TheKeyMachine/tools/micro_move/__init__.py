@@ -19,6 +19,7 @@ class MicroMoveToolObject(ToolObject):
             "get_checked": api.is_enabled,
             "set_checked": api.toggle,
             "tooltip": TOOLTIPS["micro_move"],
+            "keywords": ["precision movement", "fine translation"],
         },
     }
     SECTION = {

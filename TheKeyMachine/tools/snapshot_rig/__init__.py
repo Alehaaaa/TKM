@@ -21,6 +21,7 @@ class SnapshotRigToolObject(ToolObject):
             "icon": "snapshot",
             "callback": api.snapshot_rig,
             "tooltip": TOOLTIPS["rig"],
+            "keywords": ["capture character rig", "store rig state"],
             "operation": {"undo": False, "suspend_refresh": True},
         },
         "snapshot_default": {
@@ -29,6 +30,7 @@ class SnapshotRigToolObject(ToolObject):
             "icon": "snapshot_default",
             "callback": api.snapshot_default,
             "tooltip": TOOLTIPS["default"],
+            "keywords": ["snapshot reset", "snapshot restore"],
             "menu": {
                 "label": "Snapshot Default",
                 "icon": "snapshot_default",
@@ -42,6 +44,7 @@ class SnapshotRigToolObject(ToolObject):
             "icon": "snapshot_opposite",
             "callback": api.snapshot_opposite,
             "tooltip": TOOLTIPS["opposite"],
+            "keywords": ["snapshot other side", "snapshot counterpart"],
             "menu": {
                 "label": "Snapshot Opposite",
                 "icon": "snapshot_opposite",
@@ -58,6 +61,7 @@ class SnapshotRigToolObject(ToolObject):
             "icon": "snapshot_mirror",
             "callback": api.snapshot_mirror,
             "tooltip": TOOLTIPS["mirror"],
+            "keywords": ["snapshot flip", "snapshot reflect"],
             "menu": {
                 "label": "Snapshot Mirror",
                 "icon": "snapshot_mirror",
@@ -74,6 +78,7 @@ class SnapshotRigToolObject(ToolObject):
             "icon": "snapshot_opposite",
             "callback": api.remove_selected_opposites,
             "tooltip": TOOLTIPS["remove_selected_opposite"],
+            "keywords": ["remove selected other side snapshots", "remove selected counterpart snapshots"],
             "pinnable": False,
             "operation": {"undo": False},
         },
@@ -83,6 +88,7 @@ class SnapshotRigToolObject(ToolObject):
             "icon": "snapshot_opposite",
             "callback": api.clear_all_opposites,
             "tooltip": TOOLTIPS["clear_all_opposite"],
+            "keywords": ["clear all other side snapshots", "clear all counterpart snapshots"],
             "pinnable": False,
             "operation": {"undo": False},
         },
@@ -92,6 +98,7 @@ class SnapshotRigToolObject(ToolObject):
             "icon": "snapshot_mirror",
             "callback": api.remove_selected_mirrors,
             "tooltip": TOOLTIPS["remove_selected_mirror"],
+            "keywords": ["remove selected flip snapshots", "remove selected reflect snapshots"],
             "pinnable": False,
             "operation": {"undo": False},
         },
@@ -101,6 +108,7 @@ class SnapshotRigToolObject(ToolObject):
             "icon": "snapshot_mirror",
             "callback": api.clear_all_mirrors,
             "tooltip": TOOLTIPS["clear_all_mirror"],
+            "keywords": ["clear all flip snapshots", "clear all reflect snapshots"],
             "pinnable": False,
             "operation": {"undo": False},
         },
@@ -111,6 +119,7 @@ class SnapshotRigToolObject(ToolObject):
             "pinnable": False,
             "callback": lambda: general.open_url(SnapshotRigToolObject.DOC_URL),
             "tooltip": TOOLTIPS["help"],
+            "keywords": ["snapshot rig documentation", "rig capture guide"],
         },
     }
 

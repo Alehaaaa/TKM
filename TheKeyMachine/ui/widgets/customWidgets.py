@@ -2513,6 +2513,10 @@ class QFlatSectionWidget(QtWidgets.QWidget):
         self._tint_color = color
 
         self._widgets = {}  # slot_key -> widget mapping
+        # Authoritative pinned state: the single source of truth that widget
+        # visibility, the saved pin_<key> setting, and the shared control-state
+        # bus are all derived from (see _apply_widget_pin_states / _set_pinned).
+        self._pinned_keys = set()
         self._menu_metadata = []  # for non-slider sections (toolbar buttons etc.)
         self._default_keys = []
         self._entry_animation = None
@@ -2816,13 +2820,18 @@ class QFlatSectionWidget(QtWidgets.QWidget):
                 visible = default
             manager = runtime.get_runtime_manager()
             state_key = self._pin_state_key(key)
+            # Initial pinned state, one documented precedence: the shared
+            # control-state bus (a live sibling section already decided) wins,
+            # then the saved setting, then the tool's default.
             if manager.has_control_state(state_key):
                 visible = bool(manager.get_control_state(state_key))
             else:
                 manager.set_control_state(state_key, bool(visible))
+            self._set_pinned(key, visible)
             self._set_widget_visibility(widget, visible, animate=bool(visible))
             self._sync_section_visibility()
         else:
+            self._set_pinned(key, bool(default))
             self._set_widget_visibility(widget, bool(default))
 
         if hasattr(widget, "setToolTipData"):
@@ -3026,6 +3035,7 @@ class QFlatSectionWidget(QtWidgets.QWidget):
             if visible and widget.isHidden() and reveal_widget is None:
                 reveal_widget = widget
             widget.setVisible(visible)
+            self._set_pinned(key, visible)
             applied_states[key] = visible
         setting_values = dict(additional_settings or {})
         if save_setting:
@@ -3057,6 +3067,7 @@ class QFlatSectionWidget(QtWidgets.QWidget):
         self.layout().removeWidget(widget)
         self._menu_metadata = [item for item in self._menu_metadata if item.get("id") != key]
         self._default_keys = [item_key for item_key in self._default_keys if item_key != key]
+        self._pinned_keys.discard(key)
         runtime.delete_widget(widget)
         self._sync_section_visibility()
         return True
@@ -3255,11 +3266,11 @@ class QFlatSectionWidget(QtWidgets.QWidget):
         animation.start()
 
     def pin_widget_defaults(self, menu=None):
-        """Restore each widget slot's default visibility.
+        """Restore each pinnable slot to its own default visibility.
 
-        A slider's own mode is fixed for its lifetime (see
-        _on_slider_mode_requested), so -- same as a toolbutton -- there is
-        nothing left to restore per-widget beyond visibility.
+        Every slot -- a toolbutton or one of a slider's modes -- is
+        independent, so a slider section can ship with (and restore to)
+        several modes pinned at once, just like any other set of defaults.
         """
         states = {
             item["id"]: bool(item.get("default", True))
@@ -3269,7 +3280,7 @@ class QFlatSectionWidget(QtWidgets.QWidget):
         self._apply_widget_pin_states(states, menu=menu)
 
     def pin_widget_all(self, menu=None):
-        """Show every pinnable widget without changing slider modes."""
+        """Pin every pinnable widget, including every slider mode at once."""
         states = {
             item["id"]: True
             for item in self._menu_metadata
@@ -3285,68 +3296,44 @@ class QFlatSectionWidget(QtWidgets.QWidget):
 
         return handler
 
-    def _is_pin_key_checked(self, key):
-        """A pin key is checked iff its own widget slot is visible.
+    def _set_pinned(self, key, pinned):
+        """Update the authoritative pinned set for *key*.
 
-        Sliders are pinned exactly like toolbuttons: one key, one widget,
-        one visibility flag. Which mode a visible slider slot is currently
-        displaying (changeable via right-click) never factors in here.
+        The one writer of pin truth. Widget visibility, the saved setting, and
+        the shared control-state bus are all derived from this in
+        _apply_widget_pin_states; nothing else should mutate _pinned_keys.
         """
-        widget = self._widgets.get(key)
+        if pinned:
+            self._pinned_keys.add(key)
+        else:
+            self._pinned_keys.discard(key)
+
+    def _is_pin_key_checked(self, key):
+        """Whether *key* is pinned, read from the authoritative pinned set.
+
+        Sliders are pinned exactly like toolbuttons: one key, one pinned flag.
+        Reading the set (not live widget visibility) keeps the menu checkmark
+        and visibility from ever silently disagreeing.
+        """
+        pinned_keys = getattr(self, "_pinned_keys", None)
+        if pinned_keys is not None:
+            return key in pinned_keys
+
+        # Compatibility for lightweight/pre-initialized section objects that
+        # have widget slots but have not established the authoritative set yet.
+        widget = getattr(self, "_widgets", {}).get(key)
         return bool(widget and QtCompat.isValid(widget) and not widget.isHidden())
 
-    @staticmethod
-    def _force_menu_repaint(menu):
-        """Force a QMenu to redraw its actions' current checked state.
-
-        QMenu does not reliably repaint a checkable action's indicator when
-        the action is checked/unchecked programmatically (as opposed to by a
-        direct user click) while the menu stays open. This is most visible
-        for a cascaded submenu the user is actively looking at -- e.g. right
-        after "Pin All"/"Pin Defaults" is clicked with the section flyout
-        still open. A plain update()/repaint() is sometimes a no-op because
-        Qt doesn't consider anything dirty; toggling updatesEnabled forces a
-        real invalidate first.
-
-        "Pin All"/"Pin Defaults" flip many actions at once from *inside* the
-        menu's own mouseReleaseEvent, so Qt is still mid-way through its own
-        click bookkeeping when this runs. An immediate repaint can therefore
-        still get swallowed. Schedule a second, deferred pass that runs after
-        the current event has fully finished, once Qt's internal state has
-        settled -- that pass is what reliably makes every changed action's
-        checkmark actually show up, not just the ones a plain synchronous
-        repaint happens to catch.
-        """
-        if menu is None or not QtCompat.isValid(menu):
-            return
-
-        def _repaint(menu=menu):
-            if not QtCompat.isValid(menu):
-                return
-            menu.setUpdatesEnabled(False)
-            menu.setUpdatesEnabled(True)
-            menu.update()
-            menu.repaint()
-            for action in menu.actions():
-                if QtCompat.isValid(action):
-                    rect = menu.actionGeometry(action)
-                    if rect.isValid():
-                        menu.update(rect)
-
-        _repaint()
-        QtCore.QTimer.singleShot(0, _repaint)
-
     def _bind_pin_menu_action(self, menu, action, key, checked):
-        def sync_action(action=action, menu=menu, section=self, widget_key=key):
+        def sync_action(action=action, section=self, widget_key=key):
             if not QtCompat.isValid(action):
                 return
-            checked_now = section._is_pin_key_checked(widget_key)
-            blocked = action.blockSignals(True)
-            try:
-                action.setChecked(checked_now)
-            finally:
-                action.blockSignals(blocked)
-            section._force_menu_repaint(menu)
+            # Plain setChecked, no signal blocking: a QMenu repaints a checkable
+            # action's checkmark when it receives that action's `changed`
+            # signal, so this updates the open menu live -- no repaint hacks.
+            # The handler is wired to `triggered`, not `toggled`, so a
+            # programmatic setChecked never re-enters it.
+            action.setChecked(section._is_pin_key_checked(widget_key))
 
         try:
             toolCommon.replace_tracked_connection(
@@ -3368,13 +3355,27 @@ class QFlatSectionWidget(QtWidgets.QWidget):
         for key, action in getattr(menu, "_tkm_actions", {}).items():
             if action is None or not QtCompat.isValid(action):
                 continue
-            checked = self._is_pin_key_checked(key)
-            blocked = action.blockSignals(True)
-            try:
-                action.setChecked(checked)
-            finally:
-                action.blockSignals(blocked)
-        self._force_menu_repaint(menu)
+            # Plain setChecked, no blockSignals: a QMenu only repaints a
+            # checkable action's indicator when it receives that action's
+            # `changed` signal, so blocking signals here left the open menu
+            # visually stale after Pin All/Defaults. These actions fire their
+            # handler on `triggered`, never on `toggled`, so a programmatic
+            # setChecked cannot re-enter the pin handler.
+            action.setChecked(self._is_pin_key_checked(key))
+
+    def _defer_pin_action(self, action, pin_fn, menu):
+        """Run a Pin All/Defaults action after the menu's own mouse event.
+
+        Every other menu action already defers its callback this way (see
+        MenuWidget.addAction). Changing widget visibility inline inside the
+        menu's mouseReleaseEvent relaid the open menu out mid-event, leaving it
+        unable to register further clicks after the first; deferring lets the
+        menu finish the event first, then applies the change -- whose `changed`
+        signals repaint the checkmarks live.
+        """
+        action.triggered.connect(
+            lambda: QtCore.QTimer.singleShot(0, lambda: pin_fn(menu=menu))
+        )
 
     def _refresh_layout(self):
         """Trigger a height recalculation."""
@@ -3480,11 +3481,11 @@ class QFlatSectionWidget(QtWidgets.QWidget):
         pin_def_action = menu.addAction(
             QtGui.QIcon(icons.dot_round), i18n.tr("pin_defaults", "Pin Defaults"), open=True
         )
-        pin_def_action.triggered.connect(lambda: self.pin_widget_defaults(menu=menu))
+        self._defer_pin_action(pin_def_action, self.pin_widget_defaults, menu)
         pin_all_action = menu.addAction(
             QtGui.QIcon(icons.dot_round), i18n.tr("pin_all", "Pin All"), open=True
         )
-        pin_all_action.triggered.connect(lambda: self.pin_widget_all(menu=menu))
+        self._defer_pin_action(pin_all_action, self.pin_widget_all, menu)
 
     def _build_menu(self):
         if not self._hiddeable:

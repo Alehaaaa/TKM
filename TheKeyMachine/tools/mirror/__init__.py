@@ -17,6 +17,7 @@ class MirrorToolObject(ToolObject):
         "select_opposite": {
             "type": "tool", "label": "Select Opposite", "icon": "opposite_select",
             "callback": api.select_opposite, "tooltip": TOOLTIPS["select_opposite"],
+            "keywords": ["other side", "symmetry"],
             "menu": {
                 "label": "Select Opposite",
                 "icon": "opposite_select",
@@ -31,10 +32,12 @@ class MirrorToolObject(ToolObject):
         "opposite_add": {
             "type": "tool", "label": "Add Opposite", "icon": "opposite_add",
             "callback": api.add_select_opposite, "tooltip": TOOLTIPS["add_opposite"],
+            "keywords": ["add other side", "add counterpart"],
         },
         "opposite_copy": {
             "type": "tool", "label": "Copy Opposite", "icon": "opposite_copy",
             "callback": api.copy_opposite, "tooltip": TOOLTIPS["copy_opposite"],
+            "keywords": ["copy other side", "copy counterpart"],
         },
         "mirror": {
             "type": "tool",
@@ -42,6 +45,7 @@ class MirrorToolObject(ToolObject):
             "icon": "mirror",
             "callback": api.mirror,
             "tooltip": TOOLTIPS["mirror"],
+            "keywords": ["flip", "symmetry"],
             "menu": {
                 "label": "Mirror",
                 "icon": "mirror",
@@ -63,31 +67,38 @@ class MirrorToolObject(ToolObject):
         "mirror_to_right": {
             "type": "tool", "label": "Mirror to Right", "icon": "mirror",
             "callback": api.mirror_to_right, "tooltip": TOOLTIPS["to_right"],
+            "keywords": ["flip to right", "reflect to right"],
         },
         "mirror_to_left": {
             "type": "tool", "label": "Mirror to Left", "icon": "mirror",
             "callback": api.mirror_to_left, "tooltip": TOOLTIPS["to_left"],
+            "keywords": ["flip to left", "reflect to left"],
         },
         "mirror_all_keys": {
             "type": "tool", "label": "Mirror All Keys", "icon": "mirror",
             "callback": api.mirror_all_keys, "tooltip": TOOLTIPS["all_keys"],
+            "keywords": ["mirror whole animation", "mirror entire timeline"],
         },
         "mirror_add_invert": {
             "type": "tool", "label": "Add Exception Invert", "icon": "mirror",
             "callback": api.add_invert_exception, "tooltip": TOOLTIPS["add_invert"],
+            "keywords": ["include exception invert", "create exception invert"],
         },
         "mirror_add_keep": {
             "type": "tool", "label": "Add Exception Keep", "icon": "mirror",
             "callback": api.add_keep_exception, "tooltip": TOOLTIPS["add_keep"],
+            "keywords": ["include exception keep", "create exception keep"],
         },
         "mirror_remove_exc": {
             "type": "tool", "label": "Remove Exception", "icon": "mirror",
             "callback": api.remove_exception, "tooltip": TOOLTIPS["remove_exception"],
+            "keywords": ["delete exception", "discard exception"],
         },
         "mirror_help": {
             "type": "tool", "label": "Help", "icon": "help", "pinnable": False,
             "callback": lambda: general.open_url(MirrorToolObject.DOC_URL),
             "tooltip": TOOLTIPS["help"],
+            "keywords": ["mirror documentation", "symmetry tool guide"],
         },
     }
 

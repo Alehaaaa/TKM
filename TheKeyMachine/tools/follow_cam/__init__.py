@@ -17,6 +17,7 @@ class FollowCamToolObject(ToolObject):
             "icon": "follow_cam",
             "callback": lambda *args: api.create_follow_cam(translation=True, rotation=True),
             "tooltip": TOOLTIPS["follow_cam"],
+            "keywords": ["tracking camera", "camera follow rig"],
         },
         "follow_cam_translation": {
             "type": "tool",
@@ -24,6 +25,7 @@ class FollowCamToolObject(ToolObject):
             "icon": "follow_cam",
             "callback": lambda: api.create_follow_cam(translation=True, rotation=False),
             "tooltip": TOOLTIPS["follow_cam_translation"],
+            "keywords": ["follow only position", "follow only translate channels"],
         },
         "follow_cam_rotation": {
             "type": "tool",
@@ -31,6 +33,7 @@ class FollowCamToolObject(ToolObject):
             "icon": "follow_cam",
             "callback": lambda: api.create_follow_cam(translation=False, rotation=True),
             "tooltip": TOOLTIPS["follow_cam_rotation"],
+            "keywords": ["follow only orientation", "follow only rotate channels"],
         },
         "follow_cam_remove": {
             "type": "tool",
@@ -38,6 +41,7 @@ class FollowCamToolObject(ToolObject):
             "icon": "remove",
             "callback": api.remove_follow_cam,
             "tooltip": TOOLTIPS["remove_follow_cam"],
+            "keywords": ["remove tracking camera", "remove camera follow rig"],
         },
     }
 

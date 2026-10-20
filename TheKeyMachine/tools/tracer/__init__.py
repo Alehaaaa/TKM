@@ -19,6 +19,7 @@ class TracerToolObject(ToolObject):
             "get_checked": api.has_any_tracer,
             "set_checked": api.set_tracer_enabled,
             "tooltip": TOOLTIPS["create"],
+            "keywords": ["motion trail", "animation trajectory"],
             "operation": {
                 "undo": True,
                 "suspend_refresh": True,
@@ -147,6 +148,7 @@ class TracerToolObject(ToolObject):
             "icon": "tracer",
             "callback": api.create_additional_tracer,
             "tooltip": TOOLTIPS["create_another"],
+            "keywords": ["create motion trail", "create animation trajectory"],
             "operation": {
                 "suspend_refresh": True,
                 "rollback_on_cancel": True,
@@ -159,6 +161,7 @@ class TracerToolObject(ToolObject):
             "icon": "tracer",
             "callback": api.set_tracer_playback_range,
             "tooltip": TOOLTIPS["set_range"],
+            "keywords": ["set frame span", "set time interval"],
         },
         "tracer_refresh": {
             "type": "tool",
@@ -166,6 +169,7 @@ class TracerToolObject(ToolObject):
             "icon": "tracer_refresh",
             "callback": api.refresh_tracer,
             "tooltip": TOOLTIPS["refresh"],
+            "keywords": ["force update display", "force rebuild view"],
         },
         "tracer_show_hide": {
             "type": "tool",
@@ -173,6 +177,7 @@ class TracerToolObject(ToolObject):
             "icon": "tracer_show_hide",
             "callback": api.toggle_tracer,
             "tooltip": TOOLTIPS["toggle"],
+            "keywords": ["toggle motion trail", "toggle animation trajectory"],
         },
         "tracer_offset_node": {
             "type": "tool",
@@ -180,6 +185,7 @@ class TracerToolObject(ToolObject):
             "icon": "tracer_select_offset",
             "callback": api.select_tracer_offset_node,
             "tooltip": TOOLTIPS["offset"],
+            "keywords": ["pick offset object", "choose offset object"],
         },
         "tracer_world_space": {
             "type": "tool",
@@ -187,6 +193,7 @@ class TracerToolObject(ToolObject):
             "icon": "tracer",
             "callback": api.set_world_space,
             "tooltip": TOOLTIPS["world_space"],
+            "keywords": ["tracer global coordinates", "world-space motion trail"],
             "operation": {"suspend_refresh": True, "rollback_on_cancel": True},
         },
         "tracer_camera_space": {
@@ -195,6 +202,7 @@ class TracerToolObject(ToolObject):
             "icon": "tracer",
             "callback": api.set_camera_space,
             "tooltip": TOOLTIPS["camera_space"],
+            "keywords": ["tracer camera coordinates", "view-space motion trail"],
             "operation": {"suspend_refresh": True, "rollback_on_cancel": True},
         },
         "tracer_relative_space": {
@@ -203,6 +211,7 @@ class TracerToolObject(ToolObject):
             "icon": "tracer",
             "callback": api.set_relative_space,
             "tooltip": TOOLTIPS["relative_space"],
+            "keywords": ["tracer offset coordinates", "relative motion trail"],
             "operation": {"suspend_refresh": True, "rollback_on_cancel": True},
         },
         "tracer_grey": {
@@ -211,6 +220,7 @@ class TracerToolObject(ToolObject):
             "icon": "tracer_grey",
             "callback": api.set_tracer_grey_color,
             "tooltip": TOOLTIPS["grey"],
+            "keywords": ["motion trail color grey", "animation trajectory color grey"],
         },
         "tracer_red": {
             "type": "tool",
@@ -218,6 +228,7 @@ class TracerToolObject(ToolObject):
             "icon": "tracer_red",
             "callback": api.set_tracer_red_color,
             "tooltip": TOOLTIPS["red"],
+            "keywords": ["motion trail color red", "animation trajectory color red"],
         },
         "tracer_blue": {
             "type": "tool",
@@ -225,6 +236,7 @@ class TracerToolObject(ToolObject):
             "icon": "tracer_blue",
             "callback": api.set_tracer_blue_color,
             "tooltip": TOOLTIPS["blue"],
+            "keywords": ["motion trail color blue", "animation trajectory color blue"],
         },
         "tracer_remove": {
             "type": "tool",
@@ -232,6 +244,7 @@ class TracerToolObject(ToolObject):
             "icon": "tracer_remove",
             "callback": api.remove_tracer,
             "tooltip": TOOLTIPS["remove"],
+            "keywords": ["remove motion trail", "remove animation trajectory"],
         },
         "tracer_style_cycle": {
             "type": "tool",
@@ -239,6 +252,7 @@ class TracerToolObject(ToolObject):
             "icon": "tracer",
             "callback": api.cycle_tracer_style,
             "tooltip": TOOLTIPS["cycle_style"],
+            "keywords": ["cycle motion trail style", "cycle animation trajectory style"],
         },
         "tracer_range_cycle": {
             "type": "tool",
@@ -246,6 +260,7 @@ class TracerToolObject(ToolObject):
             "icon": "tracer",
             "callback": api.cycle_tracer_range,
             "tooltip": TOOLTIPS["cycle_range"],
+            "keywords": ["cycle motion trail range", "cycle animation trajectory range"],
         },
         "tracer_performance_cycle": {
             "type": "tool",
@@ -253,6 +268,7 @@ class TracerToolObject(ToolObject):
             "icon": "tracer_refresh",
             "callback": api.cycle_performance,
             "tooltip": TOOLTIPS["cycle_performance"],
+            "keywords": ["cycle motion trail performance", "cycle animation trajectory performance"],
         },
         "tracer_falloff": {
             "type": "check",
@@ -262,6 +278,7 @@ class TracerToolObject(ToolObject):
             "get_checked": api.has_transparency_falloff,
             "set_checked": api.set_transparency_falloff,
             "tooltip": TOOLTIPS["falloff"],
+            "keywords": ["tracer transparency falloff", "transparency falloff command"],
         },
         "tracer_xray": {
             "type": "check",
@@ -271,6 +288,7 @@ class TracerToolObject(ToolObject):
             "get_checked": api.is_xray_enabled,
             "set_checked": api.set_xray,
             "tooltip": TOOLTIPS["xray"],
+            "keywords": ["x ray motion trail", "x ray animation trajectory"],
         },
         "tracer_connected": {
             "type": "check",
@@ -280,6 +298,7 @@ class TracerToolObject(ToolObject):
             "get_checked": api.is_connected,
             "set_checked": api.set_connected,
             "tooltip": TOOLTIPS["connected"],
+            "keywords": ["live tracer updates", "refresh tracer automatically"],
         },
     }
     SECTION = {

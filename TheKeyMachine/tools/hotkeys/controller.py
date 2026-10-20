@@ -715,6 +715,27 @@ def _tool_data_for_command(command_name):
         return {}
 
 
+def _row_keywords(primary_data, fallback_data):
+    """Collect a command's optional Search keywords/aliases.
+
+    A tool declares ``"keywords": ["bake", "retime", ...]`` beside its label to
+    be findable in Search by synonyms its title does not contain. We merge the
+    tool's own definition with any section-item fallback, fold case-insensitive
+    duplicates, and keep only non-empty strings; a tool without the key
+    contributes nothing.
+    """
+    merged = []
+    seen = set()
+    for source in (primary_data, fallback_data):
+        for keyword in (source or {}).get("keywords") or ():
+            keyword = str(keyword).strip()
+            folded = keyword.lower()
+            if keyword and folded not in seen:
+                seen.add(folded)
+                merged.append(keyword)
+    return merged
+
+
 def _command_row_from_data(command_name, primary_data, fallback_data=None, title_override=None):
     if not command_name:
         return None
@@ -754,6 +775,7 @@ def _command_row_from_data(command_name, primary_data, fallback_data=None, title
             or tooltip
         ),
         "shortcuts": primary_data.get("shortcuts", fallback_data.get("shortcuts", [])),
+        "keywords": _row_keywords(primary_data, fallback_data),
         "checkable": bool(primary_data.get("checkable", primary_data.get("type") in {"check", "setting"})),
         "callback": primary_data.get("callback") or fallback_data.get("callback"),
         "get_checked": (

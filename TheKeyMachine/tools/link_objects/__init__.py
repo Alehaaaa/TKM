@@ -19,6 +19,7 @@ class LinkObjectsToolObject(ToolObject):
             "icon": "link_relative",
             "callback": api.copy_relationship,
             "tooltip": TOOLTIPS["copy_relationship"],
+            "keywords": ["capture object relationship", "copy constraint"],
             "operation": {"undo": False},
         },
         "link_paste": {
@@ -27,6 +28,7 @@ class LinkObjectsToolObject(ToolObject):
             "icon": "link_relative_paste",
             "callback": api.paste_relationship,
             "tooltip": TOOLTIPS["paste_relationship"],
+            "keywords": ["apply object relationship", "paste constraint"],
             "operation": {"suspend_refresh": True, "rollback_on_cancel": True},
         },
         "link_paste_range": {
@@ -35,6 +37,7 @@ class LinkObjectsToolObject(ToolObject):
             "icon": "link_relative_paste",
             "callback": api.paste_relationship_to_range,
             "tooltip": TOOLTIPS["paste_range"],
+            "keywords": ["apply object relationship to range", "paste constraint to range"],
             "operation": {"suspend_refresh": True, "rollback_on_cancel": True},
         },
         "link_autolink": {
@@ -46,6 +49,7 @@ class LinkObjectsToolObject(ToolObject):
             "get_checked": api.is_auto_link_enabled,
             "set_checked": api.set_auto_link_enabled,
             "tooltip": TOOLTIPS["auto_link"],
+            "keywords": ["link auto link", "auto link command"],
         },
         "link_help": {
             "type": "tool",
@@ -53,6 +57,7 @@ class LinkObjectsToolObject(ToolObject):
             "icon": "help",
             "callback": lambda: general.open_url(LinkObjectsToolObject.DOC_URL),
             "tooltip": TOOLTIPS["help"],
+            "keywords": ["capture object relationship help", "copy constraint help"],
             "pinnable": False,
         },
     }

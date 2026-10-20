@@ -53,33 +53,104 @@ def _searchable_tooltip_text(row):
     return normalize_query(re.sub(r"<[^>]+>", " ", combined))
 
 
-def match_rank(row, query):
-    title = str(row.get("title") or "")
-    command = str(row.get("command") or "")
-    title_lower = title.lower()
-    command_lower = command.lower().replace("_", " ")
-    if not query or title_lower.startswith(query):
-        return 0
-    if any(word.startswith(query) for word in title_lower.split()):
-        return 1
-    if query in title_lower:
-        return 2
-    if query in command_lower:
-        return 3
-    if query in _searchable_tooltip_text(row):
-        return 4
-    return None
+# Positional ranking: compile the query as a case-insensitive regex and score
+# every searchable term of a command with
+#
+#     100 / ((1 + match.start()) * (matched_length + 1))
+#
+# so an earlier, tighter match ranks higher -- an exact prefix of a short name
+# wins, while a loose mid-string match still scores > 0 and stays discoverable.
+# The score is spread across each row's title, command id, and explicit
+# keyword/alias list (its "primary" terms), and falls back to help text at a
+# heavily reduced weight so a tooltip-only hit never outranks a name hit.
+# Multi-word queries require every token to match somewhere.
+
+# Help-text matches are always ranked below any name/keyword match.
+_SECONDARY_WEIGHT = 0.01
+
+
+def _match_score(regex, text):
+    """Positional score for one term; 0.0 when it does not match."""
+    if not text:
+        return 0.0
+    match = regex.search(text)
+    if match is None:
+        return 0.0
+    start = match.start()
+    length = match.end() - match.start()
+    return 100.0 / ((1 + start) * (length + 1))
+
+
+def _primary_terms(row):
+    """The high-signal strings a row is matched against: its name and aliases."""
+    terms = []
+    title = str(row.get("title") or "").strip()
+    if title:
+        terms.append(title)
+    command = str(row.get("command") or "").strip()
+    if command:
+        # Command ids read as snake_case; score them as space-separated words
+        # so "world space" matches "worldspace_to_local" the way a user types.
+        terms.append(command.replace("_", " "))
+    for keyword in row.get("keywords") or ():
+        keyword = str(keyword).strip()
+        if keyword:
+            terms.append(keyword)
+    return terms
+
+
+def _score_row(row, token_regexes):
+    """Combined score for *row*, or None if any query token matches nothing."""
+    primary = _primary_terms(row)
+    secondary = _searchable_tooltip_text(row)
+    total = 0.0
+    for regex in token_regexes:
+        best = 0.0
+        for term in primary:
+            score = _match_score(regex, term)
+            if score > best:
+                best = score
+        if best == 0.0 and secondary:
+            best = _match_score(regex, secondary) * _SECONDARY_WEIGHT
+        if best == 0.0:
+            return None
+        total += best
+    return total
+
+
+def match_score(row, text):
+    """Public single-row score used by tests; None means the row is excluded."""
+    query = normalize_query(text)
+    if not query:
+        return None
+    token_regexes = [re.compile(re.escape(token), re.IGNORECASE) for token in query.split()]
+    return _score_row(row, token_regexes) if token_regexes else None
 
 
 def ranked_command_rows(rows, text):
     query = normalize_query(text)
-    matches = []
-    for row in rows:
-        rank = match_rank(row, query)
-        if rank is not None:
-            matches.append((rank, row))
-    matches.sort(key=lambda entry: entry[0])
-    return [row for _rank, row in matches]
+    if not query:
+        return []
+    token_regexes = [re.compile(re.escape(token), re.IGNORECASE) for token in query.split()]
+    if not token_regexes:
+        return []
+
+    # Very short queries tie many names at the same score, so sort those
+    # buckets alphabetically; longer queries keep match order. Either way fall
+    # back to catalog order so the result is stable.
+    short_query = len(query) < 3
+    scored = []
+    for order, row in enumerate(rows):
+        score = _score_row(row, token_regexes)
+        if score is None:
+            continue
+        scored.append((score, order, row))
+
+    if short_query:
+        scored.sort(key=lambda entry: (-entry[0], str(entry[2].get("title") or "").lower(), entry[1]))
+    else:
+        scored.sort(key=lambda entry: (-entry[0], entry[1]))
+    return [row for _score, _order, row in scored]
 
 
 def completion_suffix(typed, title):

@@ -16,6 +16,7 @@ class AnimationToolsToolObject(ToolObject):
             "label": "Anim Curve Tools",
             "text": "AT",
             "tooltip": TOOLTIPS["animation_tools"],
+            "keywords": ["animation curve tools", "fcurve tools"],
             "menu": {
                 "label": "Anim Curve Tools",
                 "items": [
@@ -50,6 +51,7 @@ class AnimationToolsToolObject(ToolObject):
             "text": "S",
             "callback": api.set_smart_key,
             "tooltip": TOOLTIPS["smart_key"],
+            "keywords": ["set key active channels", "set context aware keyframe"],
             "operation": {"preserve_time_selection": True},
         },
         "set_smart_key_all_channels": {
@@ -58,6 +60,7 @@ class AnimationToolsToolObject(ToolObject):
             "text": "S+",
             "callback": api.set_smart_key_all_channels,
             "tooltip": TOOLTIPS["smart_key_all"],
+            "keywords": ["set key active channels all channels", "set context aware keyframe all channels"],
             "operation": {"preserve_time_selection": True},
         },
         "apply_smart_euler_filter": {
@@ -66,6 +69,7 @@ class AnimationToolsToolObject(ToolObject):
             "icon": "euler_filter",
             "callback": api.apply_smart_euler_filter,
             "tooltip": TOOLTIPS["euler_filter"],
+            "keywords": ["apply fix rotation flips", "apply unwrap rotation curves"],
         },
         "snap": {
             "type": "tool",
@@ -74,6 +78,7 @@ class AnimationToolsToolObject(ToolObject):
             "icon": "snap",
             "callback": api.snap_keyframes,
             "tooltip": TOOLTIPS["snap"],
+            "keywords": ["quantize selected keyframes", "snap animation keys to frames"],
         },
         "clear_animation": {
             "type": "tool",
@@ -81,6 +86,7 @@ class AnimationToolsToolObject(ToolObject):
             "icon": "delete_animation",
             "callback": api.clear_animation_keys,
             "tooltip": TOOLTIPS["clear_animation"],
+            "keywords": ["remove selected animation", "erase active motion"],
         },
         "remove_redundant_keys": {
             "type": "tool",
@@ -88,6 +94,7 @@ class AnimationToolsToolObject(ToolObject):
             "icon": "remove_redundant_keys",
             "callback": api.remove_redundant_keys,
             "tooltip": TOOLTIPS["remove_redundant"],
+            "keywords": ["remove simplify animation curves", "remove remove unnecessary keyframes"],
             "menu": {
                 "label": "Remove Redundant Keys",
                 "icon": "remove_redundant_keys",
@@ -108,6 +115,7 @@ class AnimationToolsToolObject(ToolObject):
             "icon": "remove_static_anim_curves",
             "callback": api.remove_static_anim_curves,
             "tooltip": TOOLTIPS["remove_static"],
+            "keywords": ["remove static animation curves", "remove static fcurves"],
         },
         "cut_keys": {
             "type": "tool",
@@ -115,6 +123,7 @@ class AnimationToolsToolObject(ToolObject):
             "icon": "cut_keys",
             "callback": api.cut_keys,
             "tooltip": TOOLTIPS["cut_keys"],
+            "keywords": ["cut keyframes", "cut animation keys"],
         },
         "copy_keys": {
             "type": "tool",
@@ -122,6 +131,7 @@ class AnimationToolsToolObject(ToolObject):
             "icon": "copy_keys",
             "callback": api.copy_keys,
             "tooltip": TOOLTIPS["copy_keys"],
+            "keywords": ["duplicate keys", "capture keys"],
         },
         "paste_keys": {
             "type": "tool",
@@ -129,6 +139,7 @@ class AnimationToolsToolObject(ToolObject):
             "icon": "paste_keys",
             "callback": api.paste_keys,
             "tooltip": TOOLTIPS["paste_keys"],
+            "keywords": ["apply keys", "insert keys"],
         },
         "paste_keys_relative": {
             "type": "tool",
@@ -136,6 +147,7 @@ class AnimationToolsToolObject(ToolObject):
             "icon": "paste_keys_relative",
             "callback": api.paste_keys_relative,
             "tooltip": TOOLTIPS["paste_keys_relative"],
+            "keywords": ["apply keys relative", "insert keys relative"],
         },
         "delete_keys": {
             "type": "tool",
@@ -143,6 +155,7 @@ class AnimationToolsToolObject(ToolObject):
             "icon": "trash",
             "callback": api.delete_keys,
             "tooltip": TOOLTIPS["delete_keys"],
+            "keywords": ["delete keyframes", "delete animation keys"],
         },
         "delete_all_animation": {
             "type": "tool",
@@ -150,6 +163,7 @@ class AnimationToolsToolObject(ToolObject):
             "icon": "delete_animation",
             "callback": api.clear_animation_keys,
             "tooltip": TOOLTIPS["clear_animation"],
+            "keywords": ["delete complete animation", "clear every animated channel"],
             "i18n_key": "clear_animation",
         },
         "crop_animation": {
@@ -158,6 +172,7 @@ class AnimationToolsToolObject(ToolObject):
             "icon": "crop_animation",
             "callback": api.crop_animation,
             "tooltip": TOOLTIPS["crop_animation"],
+            "keywords": ["crop motion", "crop keyframe animation"],
         },
         "reverse_animation": {
             "type": "tool",
@@ -166,6 +181,7 @@ class AnimationToolsToolObject(ToolObject):
             "text": "Rev",
             "callback": api.reverse_animation,
             "tooltip": TOOLTIPS["reverse"],
+            "keywords": ["reverse motion", "reverse keyframe animation"],
         },
         "go_to_next_key": {
             "type": "tool",
@@ -173,6 +189,7 @@ class AnimationToolsToolObject(ToolObject):
             "text": "K>",
             "callback": api.go_to_next_key,
             "tooltip": TOOLTIPS["go_to_next_key"],
+            "keywords": ["go to advance to key", "go to go forward key"],
             "operation": {"progress": False, "undo": False},
         },
         "go_to_previous_key": {
@@ -181,6 +198,7 @@ class AnimationToolsToolObject(ToolObject):
             "text": "<K",
             "callback": api.go_to_previous_key,
             "tooltip": TOOLTIPS["go_to_previous_key"],
+            "keywords": ["go to go back to key", "go to step backward key"],
             "operation": {"progress": False, "undo": False},
         },
         "go_to_next_frame": {
@@ -189,6 +207,7 @@ class AnimationToolsToolObject(ToolObject):
             "text": "F>",
             "callback": api.go_to_next_frame,
             "tooltip": TOOLTIPS["go_to_next_frame"],
+            "keywords": ["go to next timeline frame", "go to next time step"],
             "operation": {"progress": False, "undo": False},
         },
         "go_to_previous_frame": {
@@ -197,6 +216,7 @@ class AnimationToolsToolObject(ToolObject):
             "text": "<F",
             "callback": api.go_to_previous_frame,
             "tooltip": TOOLTIPS["go_to_previous_frame"],
+            "keywords": ["go to previous timeline frame", "go to previous time step"],
             "operation": {"progress": False, "undo": False},
         },
         "delete_keys_before_current": {
@@ -205,6 +225,7 @@ class AnimationToolsToolObject(ToolObject):
             "text": "<x",
             "callback": api.delete_keyframes_before_current_time,
             "tooltip": TOOLTIPS["delete_before"],
+            "keywords": ["delete keyframes before current frame", "delete animation keys before current frame"],
         },
         "delete_keys_after_current": {
             "type": "tool",
@@ -212,6 +233,7 @@ class AnimationToolsToolObject(ToolObject):
             "text": "x>",
             "callback": api.delete_keyframes_after_current_time,
             "tooltip": TOOLTIPS["delete_after"],
+            "keywords": ["delete keyframes after current frame", "delete animation keys after current frame"],
         },
     }
 
