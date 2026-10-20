@@ -1,10 +1,53 @@
 {
-  "latest": "1.0.3",
+  "latest": "1.0.4",
   "generatedFrom": {
     "versionFile": "TheKeyMachine/version",
     "changelog": "TheKeyMachine/changelog"
   },
   "releases": [
+    {
+      "version": "1.0.4",
+      "tag": "TKM-1.0.4",
+      "publishedAt": "2026-10-20T06:24:21Z",
+      "publishedLabel": "October 20, 2026",
+      "hasRelease": true,
+      "url": "https://github.com/Alehaaaa/TKM/releases/tag/TKM-1.0.4",
+      "hasDownload": true,
+      "downloadUrl": "https://github.com/Alehaaaa/TKM/releases/download/TKM-1.0.4/TKM-1.0.4.zip",
+      "entries": [
+        {
+          "kind": "new",
+          "label": "New",
+          "description": "Pause Viewport indicates automatic pausing with a blinking icon and supports an Alt-click shortcut"
+        },
+        {
+          "kind": "changed",
+          "label": "Changed",
+          "description": "Slider modes can be pinned and restored independently like regular toolbar tools"
+        },
+        {
+          "kind": "polish",
+          "label": "Polish",
+          "description": "Search understands descriptive aliases for every built-in tool and ranks complete multi-word matches more accurately"
+        },
+        {
+          "kind": "polish",
+          "label": "Polish",
+          "description": "Workspaces groups toolbar sections by named colors while keeping each slider section together"
+        },
+        {
+          "kind": "polish",
+          "label": "Polish",
+          "description": "Workspace pin rows use clearer icons and update in place when toolbar pins change"
+        },
+        {
+          "kind": "bugfix",
+          "label": "Bugfix",
+          "description": "Pin All, Pin Defaults, and detached pin menus keep their checks and slider modes synchronized"
+        }
+      ],
+      "compareUrl": "https://github.com/Alehaaaa/TKM/compare/TKM-1.0.3...TKM-1.0.4"
+    },
     {
       "version": "1.0.3",
       "tag": "TKM-1.0.3",
